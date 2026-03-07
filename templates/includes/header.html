@@ -1,0 +1,263 @@
+{{ define "header.html" }}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .Title }} - SPBU Go</title>
+    <link rel="icon" type="image/png" href="{{ if .Favicon }}{{ .Favicon }}{{ else }}/static/favicon.png{{ end }}">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            /* Dominant Light Green mixed with Blue */
+            background: linear-gradient(120deg, #e0f7fa 0%, #e8f5e9 100%);
+            background-attachment: fixed;
+            min-height: 100vh;
+            padding-top: 0;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(80, 158, 47, 0.3); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(80, 158, 47, 0.5); }
+
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            width: 100%;
+            margin: 0;
+            border-radius: 0;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05);
+            transition: all 0.3s ease;
+        }
+        .glass-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.1);
+            border-color: rgba(80, 158, 47, 0.3); /* Green hint on hover */
+        }
+        
+        /* Pertamina Colors */
+        .text-p-blue { color: #005596; }
+        .text-p-red { color: #ED1C24; }
+        .text-p-green { color: #509E2F; }
+        
+        /* Sidebar Link */
+        .sidebar-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 16px;
+            border-radius: 12px;
+            color: #475569;
+            font-weight: 500;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+        .sidebar-link:hover {
+            background: rgba(0, 85, 150, 0.08);
+            color: #005596;
+        }
+        .sidebar-link.active {
+            background: linear-gradient(135deg, rgba(0, 85, 150, 0.12), rgba(80, 158, 47, 0.08));
+            color: #005596;
+            font-weight: 600;
+        }
+        .sidebar-link .icon {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+        }
+        .sidebar-section-title {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #94a3b8;
+            padding: 0 16px;
+            margin-top: 20px;
+            margin-bottom: 8px;
+        }
+        .sidebar-section-title:first-child {
+            margin-top: 0;
+        }
+
+        /* SweetAlert Custom Font */
+        .swal2-popup {
+            font-family: 'Poppins', sans-serif !important;
+        }
+    </style>
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body class="text-slate-800">
+
+{{ if .User }}
+<!-- Top Navigation Bar -->
+<nav class="fixed top-0 left-0 right-0 z-50" x-data="{ sidebarOpen: false }">
+    <div class="glass-nav h-16 flex items-center transition-all duration-300">
+        <div class="w-full mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-full">
+            <!-- Left: Hamburger + Logo -->
+            <div class="flex items-center gap-3">
+                <!-- Hamburger Button -->
+                <button @click="sidebarOpen = !sidebarOpen" class="w-10 h-10 rounded-xl flex items-center justify-center text-slate-600 hover:text-[#005596] hover:bg-slate-100 transition focus:outline-none">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                </button>
+                <!-- Logo -->
+                <a href="/home" class="flex items-center gap-2 group">
+                    <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-[#ED1C24] via-[#509E2F] to-[#005596] shadow-md group-hover:shadow-green-500/30 transition duration-500 flex items-center justify-center text-white font-bold text-[10px]">
+                        SPBU
+                    </div>
+                    <span class="font-bold text-lg tracking-tight text-slate-800 group-hover:text-[#005596] transition">Pertamina <span class="text-[#509E2F]">Go</span></span>
+                </a>
+            </div>
+
+            <!-- Right: User Info + Logout -->
+            <div class="flex items-center gap-4">
+                <div class="text-right hidden sm:block">
+                    <p class="text-sm font-bold text-slate-800 leading-tight">{{ .User.FirstName }} {{ .User.LastName }}</p>
+                    <p class="text-[10px] text-[#509E2F] bg-green-100 px-2 py-0.5 rounded-full inline-block uppercase tracking-wider font-bold">{{ .User.Role.Name }}</p>
+                </div>
+                <button onclick="confirmLogout()" class="w-9 h-9 rounded-full bg-red-50 text-[#ED1C24] hover:bg-[#ED1C24] hover:text-white transition flex items-center justify-center shadow hover:shadow-red-500/30">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar Overlay -->
+    <div x-show="sidebarOpen" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+         @click="sidebarOpen = false"
+         class="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-40" style="display:none;"></div>
+
+    <!-- Sidebar Panel -->
+    <aside x-show="sidebarOpen"
+           x-transition:enter="transition ease-out duration-300"
+           x-transition:enter-start="-translate-x-full"
+           x-transition:enter-end="translate-x-0"
+           x-transition:leave="transition ease-in duration-200"
+           x-transition:leave-start="translate-x-0"
+           x-transition:leave-end="-translate-x-full"
+           class="fixed top-0 left-0 h-full w-72 bg-white/95 backdrop-blur-xl shadow-2xl z-50 flex flex-col border-r border-slate-100"
+           style="display:none;">
+
+        <!-- Sidebar Header -->
+        <div class="h-16 flex items-center justify-between px-5 border-b border-slate-100 flex-shrink-0">
+            <a href="/home" class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-[#ED1C24] via-[#509E2F] to-[#005596] flex items-center justify-center text-white font-bold text-[9px]">SPBU</div>
+                <span class="font-bold text-lg text-slate-800">Pertamina <span class="text-[#509E2F]">Go</span></span>
+            </a>
+            <button @click="sidebarOpen = false" class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+
+        <!-- Sidebar User Info (mobile) -->
+        <div class="px-5 py-4 border-b border-slate-100 sm:hidden">
+            <p class="text-sm font-bold text-slate-800">{{ .User.FirstName }} {{ .User.LastName }}</p>
+            <p class="text-[10px] text-[#509E2F] bg-green-100 px-2 py-0.5 rounded-full inline-block uppercase tracking-wider font-bold mt-1">{{ .User.Role.Name }}</p>
+        </div>
+
+        <!-- Sidebar Navigation -->
+        <nav class="flex-1 overflow-y-auto px-3 py-4">
+            <!-- Main -->
+            <div class="sidebar-section-title">Menu</div>
+            <a href="/home" class="sidebar-link {{ if eq .ActiveMenu "home" }}active{{ end }}">
+                <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z"></path></svg>
+                Home
+            </a>
+            <a href="/dashboard" class="sidebar-link {{ if eq .ActiveMenu "dashboard" }}active{{ end }}">
+                <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                Dashboard
+            </a>
+
+            <!-- Master Data -->
+            <div class="sidebar-section-title">Master Data</div>
+            <a href="/master/bbm" class="sidebar-link {{ if eq .ActiveMenu "master_bbm" }}active{{ end }}">
+                <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                BBM
+            </a>
+            <a href="/master/tiang" class="sidebar-link {{ if eq .ActiveMenu "master_tiang" }}active{{ end }}">
+                <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                Tiang & Nozzle
+            </a>
+
+            <!-- Settings -->
+            <div class="sidebar-section-title">Settings</div>
+            <a href="/users" class="sidebar-link {{ if eq .ActiveMenu "settings_users" }}active{{ end }}">
+                <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path></svg>
+                User Management
+            </a>
+            <a href="/settings" class="sidebar-link {{ if eq .ActiveMenu "site_settings" }}active{{ end }}">
+                <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                Site Settings
+            </a>
+        </nav>
+
+        <!-- Sidebar Footer -->
+        <div class="px-5 py-4 border-t border-slate-100 flex-shrink-0">
+            <button onclick="confirmLogout()" class="sidebar-link w-full text-red-500 hover:bg-red-50 hover:text-red-600">
+                <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                Logout
+            </button>
+        </div>
+    </aside>
+</nav>
+
+<script>
+    function confirmLogout() {
+        Swal.fire({
+            title: 'Logout?',
+            text: "Are you sure you want to end your session?",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ED1C24',
+            cancelButtonColor: '#475569',
+            confirmButtonText: 'Yes, Logout',
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdrop: `rgba(0,0,0,0.4)`
+        }).then((result) => {
+            if (result.isConfirmed) {
+                window.location.href = '/logout';
+            }
+        })
+    }
+</script>
+
+<!-- Main Container for User (Full Width) -->
+<div class="w-full mx-auto px-4 sm:px-6 lg:px-8 py-4 pt-20">
+
+{{ else }}
+
+<nav class="fixed top-0 w-full z-50 transition-all duration-300">
+    <div class="glass-nav h-20 flex items-center justify-center w-full !m-0 !w-full !rounded-none">
+        <div class="max-w-7xl w-full px-6 flex justify-between items-center">
+             <div class="flex-shrink-0 flex items-center gap-2">
+                <div class="w-8 h-8 rounded bg-gradient-to-tr from-[#ED1C24] via-[#509E2F] to-[#005596]"></div>
+                <span class="font-bold text-xl tracking-tight text-slate-800">SPBU <span class="text-p-blue">Go</span></span>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<!-- Main Container for Guest -->
+<div class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-100 to-slate-200">
+
+{{ end }}
+
+{{ end }}

@@ -1,0 +1,237 @@
+{{ define "roles/index.html" }}
+{{ template "header.html" . }}
+
+<div x-data="roleManagement()">
+    <div class="flex justify-between items-center mb-6">
+        <div>
+            <h2 class="text-3xl font-bold text-slate-800">Roles</h2>
+            <p class="text-slate-500">Manage permissions</p>
+        </div>
+        <button @click="openCreateModal()" class="px-4 py-2 glass-card hover:bg-white/80 transition text-[#005596] font-semibold rounded-lg flex items-center gap-2 border border-[#005596]/20">
+            <span>+</span> Add Role
+        </button>
+    </div>
+
+    <!-- Roles Table -->
+    <div class="glass-card rounded-2xl overflow-hidden shadow-lg min-h-[400px]">
+        <div class="overflow-x-auto">
+            <template x-if="isLoading">
+                <div class="p-4 space-y-4">
+                    <div class="h-10 skeleton w-full"></div>
+                    <div class="h-10 skeleton w-full"></div>
+                    <div class="h-10 skeleton w-full"></div>
+                    <div class="h-10 skeleton w-full"></div>
+                    <div class="h-10 skeleton w-full"></div>
+                </div>
+            </template>
+            <table class="w-full text-left" x-show="!isLoading">
+                <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-xs font-bold">
+                    <tr>
+                        <th class="p-4">Name</th>
+                        <th class="p-4">Code</th>
+                        <th class="p-4">Permissions</th>
+                        <th class="p-4 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {{ range .Roles }}
+                    <tr class="hover:bg-slate-50/50 transition duration-150">
+                        <td class="p-4 font-medium text-slate-800">{{ .Name }}</td>
+                        <td class="p-4 font-mono text-sm text-slate-500">{{ .Code }}</td>
+                        <td class="p-4">
+                            <div class="flex flex-wrap gap-1">
+                                {{ range .Permissions }}
+                                <span class="px-2 py-1 rounded-full bg-purple-50 text-purple-600 border border-purple-100 text-xs font-bold">{{ .Name }}</span>
+                                {{ end }}
+                            </div>
+                        </td>
+                        <td class="p-4 text-right space-x-2">
+                            <button @click="openEditModal({id: {{.ID}}, name: '{{.Name}}', code: '{{.Code}}'})" 
+                                    class="text-amber-500 hover:text-amber-600 transition p-1 hover:bg-amber-50 rounded">
+                                ✏️
+                            </button>
+                            <button @click="deleteRole({{ .ID }})" 
+                                    class="text-[#ED1C24] hover:text-red-700 transition p-1 hover:bg-red-50 rounded">
+                                🗑️
+                            </button>
+                        </td>
+                    </tr>
+                    {{ end }}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Create Modal -->
+    <div x-show="isCreateOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm" style="display: none;">
+        <div class="glass-card bg-white p-8 rounded-2xl w-full max-w-md relative z-10 shadow-2xl">
+            <h3 class="text-xl font-bold mb-4 text-slate-800">Add New Role</h3>
+            <form @submit.prevent="createRole">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1 text-slate-600">Name</label>
+                        <input type="text" x-model="createForm.name" class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1 text-slate-600">Code</label>
+                        <input type="text" x-model="createForm.code" class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none" required placeholder="admin">
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 mt-6">
+                    <button type="button" @click="isCreateOpen = false" class="px-4 py-2 rounded text-slate-600 hover:bg-slate-100 transition">Cancel</button>
+                    <button type="submit" :disabled="isSubmitting" class="px-4 py-2 bg-[#509E2F] hover:bg-green-700 text-white rounded font-medium shadow-lg hover:shadow-xl transition transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center">
+                        <span x-show="isSubmitting" class="spinner mr-2 w-4 h-4 border-2 !border-white !border-l-transparent"></span>
+                        <span x-text="isSubmitting ? 'Creating...' : 'Create'"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div x-show="isEditOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm" style="display: none;">
+        <div class="glass-card bg-white p-8 rounded-2xl w-full max-w-md relative z-10 shadow-2xl">
+            <h3 class="text-xl font-bold mb-4 text-slate-800">Edit Role</h3>
+            <form @submit.prevent="updateRole">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1 text-slate-600">Name</label>
+                        <input type="text" x-model="editForm.name" class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1 text-slate-600">Code</label>
+                        <input type="text" x-model="editForm.code" class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none" required>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 mt-6">
+                    <button type="button" @click="isEditOpen = false" class="px-4 py-2 rounded text-slate-600 hover:bg-slate-100 transition">Cancel</button>
+                    <button type="submit" :disabled="isSubmitting" class="px-4 py-2 bg-[#005596] hover:bg-blue-800 text-white rounded font-medium shadow-lg hover:shadow-xl transition transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center">
+                        <span x-show="isSubmitting" class="spinner mr-2 w-4 h-4 border-2 !border-white !border-l-transparent"></span>
+                        <span x-text="isSubmitting ? 'Updating...' : 'Update'"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('roleManagement', () => ({
+            isLoading: false,
+            isSubmitting: false,
+            isCreateOpen: false,
+            isEditOpen: false,
+            createForm: { name: '', code: '' },
+            editForm: { id: null, name: '', code: '' },
+
+            init() {
+                this.isLoading = true;
+                setTimeout(() => this.isLoading = false, 800);
+            },
+
+            openCreateModal() {
+                this.createForm = { name: '', code: '' };
+                this.isCreateOpen = true;
+            },
+
+            openEditModal(role) {
+                this.editForm = { ...role };
+                this.isEditOpen = true;
+            },
+
+            async createRole() {
+                this.isSubmitting = true;
+                const formData = new URLSearchParams();
+                for (const key in this.createForm) formData.append(key, this.createForm[key]);
+
+                try {
+                    const res = await fetch('/roles', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: formData
+                    });
+                    const data = await res.json();
+                    if (data.status) {
+                        this.isCreateOpen = false;
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Success!',
+                            text: 'Role created successfully',
+                            timer: 1500,
+                            showConfirmButton: false
+                        }).then(() => window.location.reload());
+                    } else {
+                        Swal.fire({ icon: 'error', title: 'Error', text: data.message });
+                    }
+                } catch (e) {
+                    Swal.fire({ icon: 'error', title: 'Error', text: 'Something went wrong' });
+                } finally {
+                    this.isSubmitting = false;
+                }
+            },
+
+            async updateRole() {
+                this.isSubmitting = true;
+                const formData = new URLSearchParams();
+                for (const key in this.editForm) {
+                    if (key !== 'id') formData.append(key, this.editForm[key]);
+                }
+
+                try {
+                    const res = await fetch(`/roles/${this.editForm.id}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: formData
+                    });
+                    const data = await res.json();
+                    if (data.status) {
+                        this.isEditOpen = false;
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Success!',
+                            text: 'Role updated successfully',
+                            timer: 1500,
+                            showConfirmButton: false
+                        }).then(() => window.location.reload());
+                    } else {
+                        Swal.fire({ icon: 'error', title: 'Error', text: data.message });
+                    }
+                } catch (e) {
+                    Swal.fire({ icon: 'error', title: 'Error', text: 'Something went wrong' });
+                } finally {
+                    this.isSubmitting = false;
+                }
+            },
+
+            deleteRole(id) {
+                Swal.fire({
+                    title: 'Are you sure?',
+                    text: "You won't be able to revert this!",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#ED1C24',
+                    cancelButtonColor: '#475569',
+                    confirmButtonText: 'Yes, delete it!'
+                }).then(async (result) => {
+                    if (result.isConfirmed) {
+                        try {
+                            const res = await fetch(`/roles/${id}/delete`, { method: 'POST' });
+                            const data = await res.json();
+                            if (data.status) {
+                                Swal.fire('Deleted!', 'Role has been deleted.', 'success').then(() => window.location.reload());
+                            } else {
+                                Swal.fire('Error', data.message, 'error');
+                            }
+                        } catch (e) {
+                            Swal.fire('Error', 'Failed to delete role', 'error');
+                        }
+                    }
+                })
+            }
+        }))
+    })
+</script>
+
+{{ template "footer.html" . }}
+{{ end }}

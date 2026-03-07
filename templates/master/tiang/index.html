@@ -1,0 +1,480 @@
+{{ define "master/tiang/index.html" }}
+{{ template "header.html" . }}
+
+<div x-data="tiangManagement()">
+    <div class="flex justify-between items-center mb-6">
+        <div>
+            <h2 class="text-3xl font-bold text-slate-800">Tiang & Nozzle Management</h2>
+            <p class="text-slate-500">Manage fuel pumps and nozzle associations</p>
+        </div>
+        <button @click="openCreateModal()" class="px-4 py-2 glass-card hover:bg-white/80 transition text-[#005596] font-semibold rounded-lg flex items-center gap-2 border border-[#005596]/20">
+            <span>+</span> Add Tiang
+        </button>
+    </div>
+
+    <!-- Tiang Table -->
+    <div class="glass-card rounded-2xl overflow-hidden shadow-lg min-h-[400px]">
+        <div class="overflow-x-auto">
+            <template x-if="isLoading">
+                <div class="p-4 space-y-4">
+                    <div class="h-10 skeleton w-full"></div>
+                    <div class="h-10 skeleton w-full"></div>
+                    <div class="h-10 skeleton w-full"></div>
+                </div>
+            </template>
+            <table class="w-full text-left" x-show="!isLoading">
+                <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-xs font-bold">
+                    <tr>
+                        <th class="p-4">Name</th>
+                        <th class="p-4 text-center">Nozzles</th>
+                        <th class="p-4">Slug</th>
+                        <th class="p-4 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {{ range .Tiangs }}
+                    <tr class="hover:bg-slate-50/50 transition duration-150">
+                        <td class="p-4 font-medium text-slate-800">{{ .Name }}</td>
+                        <td class="p-4 text-center">
+                            <span class="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-blue-100 bg-blue-600 rounded-full">
+                                {{ len .Nozzles }}
+                            </span>
+                        </td>
+                        <td class="p-4 font-mono text-slate-500">{{ .Slug }}</td>
+                        <td class="p-4 text-right space-x-2">
+                            <button @click="openEditModal({id: {{.ID}}, name: '{{.Name}}', slug: '{{.Slug}}'})" 
+                                    class="text-amber-500 hover:text-amber-600 transition p-1 hover:bg-amber-50 rounded">
+                                ✏️
+                            </button>
+                            <button @click="openNozzleModal({
+                                            id: {{.ID}}, 
+                                            name: '{{.Name}}', 
+                                            nozzles: {{ if .Nozzles }}[{{ range .Nozzles }}{id:{{.ID}}, description:'{{.Description}}', bbm_id: {{.BBMID}}, bbm: {name: '{{.BBM.Name}}'}},{{ end }}]{{ else }}[]{{ end }} 
+                                    })" 
+                                    class="text-blue-500 hover:text-blue-700 transition p-1 hover:bg-blue-50 rounded" title="Manage Nozzles">
+                                ⛽
+                            </button>
+                            <button @click="deleteTiang({{ .ID }})" 
+                                    class="text-[#ED1C24] hover:text-red-700 transition p-1 hover:bg-red-50 rounded">
+                                🗑️
+                            </button>
+                        </td>
+                    </tr>
+                    {{ end }}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Create/Edit Modal Reuse -->
+    <div x-show="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm" style="display: none;">
+        <div class="glass-card bg-white p-8 rounded-2xl w-full max-w-md relative z-10 shadow-2xl">
+            <h3 class="text-xl font-bold mb-4 text-slate-800" x-text="isEdit ? 'Edit Tiang' : 'Add New Tiang'"></h3>
+            <form @submit.prevent="submitForm">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1 text-slate-600">Name</label>
+                        <input type="text" x-model="form.name" @input="!isEdit ? form.slug = form.name.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '') : null" class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1 text-slate-600">Slug</label>
+                        <input type="text" x-model="form.slug" class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none" required>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 mt-6">
+                    <button type="button" @click="isOpen = false" class="px-4 py-2 rounded text-slate-600 hover:bg-slate-100 transition">Cancel</button>
+                    <button type="submit" :disabled="isSubmitting" class="px-4 py-2 bg-[#005596] hover:bg-blue-800 text-white rounded font-medium shadow-lg hover:shadow-xl transition transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center">
+                        <span x-show="isSubmitting" class="spinner mr-2 w-4 h-4 border-2 !border-white !border-l-transparent"></span>
+                        <span x-text="isSubmitting ? 'Saving...' : 'Save'"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <!-- Nozzle Management Modal -->
+    <div x-show="isNozzleOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm" style="display: none;">
+        <div class="glass-card bg-white p-8 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto relative z-10 shadow-2xl">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-slate-800">Manage Nozzles: <span x-text="currentTiang?.name"></span></h3>
+                <button @click="closeNozzleModal()" class="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+
+            <!-- List Existing Nozzles -->
+            <div class="mb-6">
+                <h4 class="text-sm font-semibold text-slate-500 uppercase mb-3">Existing Nozzles</h4>
+                <div class="bg-slate-50 rounded-lg p-2">
+                    <template x-if="!currentTiang?.nozzles || currentTiang.nozzles.length === 0">
+                        <p class="text-slate-400 text-center py-4 italic">No nozzles attached yet.</p>
+                    </template>
+                    <ul class="space-y-2">
+                        <template x-for="(nozzle, idx) in currentTiang?.nozzles" :key="nozzle.id">
+                            <li class="bg-white p-3 rounded shadow-sm border border-slate-100">
+                                <!-- View Mode -->
+                                <div x-show="editingNozzleId !== nozzle.id" class="flex items-center justify-between">
+                                    <div>
+                                        <div class="font-bold text-slate-700" x-text="nozzle.bbm?.name || 'Unknown BBM'"></div>
+                                        <div class="text-xs text-slate-500" x-text="nozzle.description"></div>
+                                    </div>
+                                    <div class="flex gap-1">
+                                        <button @click="startEditNozzle(nozzle)" class="text-amber-500 hover:text-amber-600 p-1 hover:bg-amber-50 rounded" title="Edit">
+                                            ✏️
+                                        </button>
+                                        <button @click="deleteNozzle(nozzle.id)" class="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded" title="Delete">
+                                            🗑️
+                                        </button>
+                                    </div>
+                                </div>
+                                <!-- Edit Mode -->
+                                <div x-show="editingNozzleId === nozzle.id" class="space-y-3">
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label class="block text-xs font-medium mb-1 text-slate-500">Fuel Type (BBM)</label>
+                                            <select x-model="editNozzleForm.bbm_id" class="w-full p-2 text-sm rounded border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none">
+                                                {{ range $.BBMs }}
+                                                <option value="{{ .ID }}">{{ .Name }}</option>
+                                                {{ end }}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-medium mb-1 text-slate-500">Description</label>
+                                            <input type="text" x-model="editNozzleForm.description" @input="editNozzleForm.description = $event.target.value.toUpperCase()" style="text-transform:uppercase" class="w-full p-2 text-sm rounded border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none">
+                                        </div>
+                                    </div>
+                                    <div class="flex justify-end gap-2">
+                                        <button @click="editingNozzleId = null" class="px-3 py-1 text-sm rounded text-slate-600 hover:bg-slate-100 transition">Cancel</button>
+                                        <button @click="updateNozzle()" :disabled="isSubmitting" class="px-3 py-1 text-sm bg-[#005596] hover:bg-blue-800 text-white rounded font-medium shadow transition disabled:opacity-50 flex items-center gap-1">
+                                            <span x-show="isSubmitting" class="w-3 h-3 border-2 border-white border-l-transparent rounded-full animate-spin"></span>
+                                            Save
+                                        </button>
+                                    </div>
+                                </div>
+                            </li>
+                        </template>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Add New Nozzle Form -->
+            <div class="border-t border-slate-200 pt-6">
+                <h4 class="text-sm font-semibold text-slate-500 uppercase mb-3">Add New Nozzle</h4>
+                <form @submit.prevent="addNozzle">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-slate-600">Fuel Type (BBM)</label>
+                            <select x-model="nozzleForm.bbm_id" class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none" required>
+                                <option value="">Select BBM...</option>
+                                {{ range .BBMs }}
+                                <option value="{{ .ID }}">{{ .Name }}</option>
+                                {{ end }}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-slate-600">Description</label>
+                            <input type="text" x-model="nozzleForm.description" @input="nozzleForm.description = $event.target.value.toUpperCase()" style="text-transform:uppercase" placeholder="e.g. NOZZLE 1" class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none" required>
+                        </div>
+                    </div>
+                    <div class="flex justify-end">
+                        <button type="submit" :disabled="isSubmitting" class="px-4 py-2 bg-[#005596] hover:bg-blue-800 text-white rounded font-medium shadow-lg hover:shadow-xl transition transform hover:-translate-y-0.5 disabled:opacity-50 flex items-center">
+                            <span x-show="isSubmitting" class="spinner mr-2 w-4 h-4 border-2 !border-white !border-l-transparent"></span>
+                            Add Nozzle
+                        </button>
+                    </div>
+                </form>
+            </div>
+                
+            <!-- Close Button -->
+            <div class="border-t border-slate-200 pt-4 mt-4 flex justify-end">
+                <button @click="closeNozzleModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('tiangManagement', () => ({
+            isLoading: false,
+            isSubmitting: false,
+            isOpen: false,
+            isEdit: false,
+            form: { id: null, name: '', slug: '' },
+            
+            // Nozzle Logic
+            isNozzleOpen: false,
+            currentTiang: null,
+            nozzleForm: { bbm_id: '', description: '', is_active: true },
+            editingNozzleId: null,
+            editNozzleForm: { id: null, bbm_id: '', description: '', tiang_id: null },
+            bbmList: [
+                {{ range .BBMs }}{id: {{ .ID }}, name: '{{ .Name }}'},{{ end }}
+            ],
+
+            init() {
+                this.isLoading = true;
+                setTimeout(() => this.isLoading = false, 500);
+            },
+
+            openCreateModal() {
+                this.isEdit = false;
+                this.form = { id: null, name: '', slug: '' };
+                this.isOpen = true;
+            },
+
+            openEditModal(tiang) {
+                this.isEdit = true;
+                this.form = { ...tiang };
+                this.isOpen = true;
+            },
+
+            openNozzleModal(tiang) {
+                this.currentTiang = tiang;
+                if (!this.currentTiang.nozzles) {
+                    this.currentTiang.nozzles = [];
+                }
+                this.sortNozzles();
+                this.nozzleForm = { bbm_id: '', description: '', is_active: true };
+                this.editingNozzleId = null;
+                this.isNozzleOpen = true;
+            },
+
+            isDuplicateDescription(desc, excludeId) {
+                const upper = desc.toUpperCase().trim();
+                return this.currentTiang.nozzles.some(n => n.description.toUpperCase().trim() === upper && n.id !== excludeId);
+            },
+
+            closeNozzleModal() {
+                this.isNozzleOpen = false;
+                this.editingNozzleId = null;
+                // Reload to sync server data with display
+                location.reload();
+            },
+
+            getBBMName(bbmId) {
+                const bbm = this.bbmList.find(b => b.id === Number(bbmId));
+                return bbm ? bbm.name : 'Unknown BBM';
+            },
+
+            sortNozzles() {
+                if (this.currentTiang?.nozzles) {
+                    this.currentTiang.nozzles.sort((a, b) => (a.description || '').localeCompare(b.description || ''));
+                }
+            },
+
+            async submitForm() {
+                this.isSubmitting = true;
+                const formData = new URLSearchParams();
+                formData.append('name', this.form.name);
+                formData.append('slug', this.form.slug);
+
+                const url = this.isEdit ? `/master/tiang/${this.form.id}` : '/master/tiang';
+                
+                try {
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: formData
+                    });
+                    const data = await res.json();
+                    
+                    if (data.status) {
+                        this.isOpen = false;
+                        Swal.fire({
+                            title: '<strong>Success!</strong>',
+                            html: `<div class="text-slate-600 mb-2">${data.message}</div>
+                                   <div class="text-sm text-slate-400">Data has been saved correctly.</div>`,
+                            icon: 'success',
+                            showConfirmButton: true,
+                            confirmButtonText: 'Great!',
+                            confirmButtonColor: '#005596',
+                            background: '#fff',
+                            customClass: {
+                                popup: 'rounded-2xl shadow-xl',
+                                confirmButton: 'px-6 py-2 rounded-lg font-bold shadow-lg transform transition hover:-translate-y-0.5'
+                            },
+                            backdrop: `rgba(0,0,123,0.1)`
+                        }).then(() => location.reload());
+                    } else {
+                        Swal.fire({ icon: 'error', title: 'Oops...', text: data.message });
+                    }
+                } catch (e) {
+                    Swal.fire({ icon: 'error', title: 'Error', text: 'Something went wrong' });
+                } finally {
+                    this.isSubmitting = false;
+                }
+            },
+
+            async addNozzle() {
+                // Validate duplicate description
+                if (this.isDuplicateDescription(this.nozzleForm.description, null)) {
+                    Swal.fire({ icon: 'warning', title: 'Duplicate', text: 'Description "' + this.nozzleForm.description + '" sudah ada di tiang ini.' });
+                    return;
+                }
+                this.isSubmitting = true;
+                const formData = new URLSearchParams();
+                formData.append('tiang_id', this.currentTiang.id);
+                formData.append('bbm_id', this.nozzleForm.bbm_id);
+                formData.append('description', this.nozzleForm.description);
+                formData.append('is_active', 'on');
+
+                try {
+                    const res = await fetch('/master/nozzle', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: formData
+                    });
+                    const data = await res.json();
+                    
+                    if (data.status) {
+                        // Add to local array without closing modal
+                        this.currentTiang.nozzles.push({
+                            id: Date.now(), // temporary ID until reload
+                            description: this.nozzleForm.description,
+                            bbm_id: Number(this.nozzleForm.bbm_id),
+                            bbm: { name: this.getBBMName(this.nozzleForm.bbm_id) }
+                        });
+                        this.sortNozzles();
+                        this.nozzleForm = { bbm_id: '', description: '', is_active: true };
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Success!',
+                            text: data.message,
+                            timer: 1500,
+                            showConfirmButton: false,
+                            toast: true,
+                            position: 'top-end'
+                        });
+                    } else {
+                        Swal.fire({ icon: 'error', title: 'Error', text: data.message });
+                    }
+                } catch (e) {
+                    Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to add nozzle' });
+                } finally {
+                    this.isSubmitting = false;
+                }
+            },
+
+            startEditNozzle(nozzle) {
+                this.editingNozzleId = nozzle.id;
+                this.editNozzleForm = {
+                    id: nozzle.id,
+                    bbm_id: String(nozzle.bbm_id),
+                    description: nozzle.description,
+                    tiang_id: this.currentTiang.id
+                };
+            },
+
+            async updateNozzle() {
+                // Validate duplicate description
+                if (this.isDuplicateDescription(this.editNozzleForm.description, this.editNozzleForm.id)) {
+                    Swal.fire({ icon: 'warning', title: 'Duplicate', text: 'Description "' + this.editNozzleForm.description + '" sudah ada di tiang ini.' });
+                    return;
+                }
+                this.isSubmitting = true;
+                const formData = new URLSearchParams();
+                formData.append('bbm_id', this.editNozzleForm.bbm_id);
+                formData.append('description', this.editNozzleForm.description);
+                formData.append('tiang_id', this.editNozzleForm.tiang_id);
+                formData.append('is_active', 'on');
+
+                try {
+                    const res = await fetch(`/master/nozzle/${this.editNozzleForm.id}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: formData
+                    });
+                    const data = await res.json();
+                    if (data.status) {
+                        // Update local data without closing modal
+                        const nozzle = this.currentTiang.nozzles.find(n => n.id === this.editNozzleForm.id);
+                        if (nozzle) {
+                            nozzle.bbm_id = Number(this.editNozzleForm.bbm_id);
+                            nozzle.description = this.editNozzleForm.description;
+                            nozzle.bbm = { name: this.getBBMName(this.editNozzleForm.bbm_id) };
+                        }
+                        this.sortNozzles();
+                        this.editingNozzleId = null;
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Updated!',
+                            text: data.message,
+                            timer: 1500,
+                            showConfirmButton: false,
+                            toast: true,
+                            position: 'top-end'
+                        });
+                    } else {
+                        Swal.fire({ icon: 'error', title: 'Error', text: data.message });
+                    }
+                } catch (e) {
+                    Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to update nozzle' });
+                } finally {
+                    this.isSubmitting = false;
+                }
+            },
+
+            async deleteNozzle(id) {
+                Swal.fire({
+                    title: 'Delete Nozzle?',
+                    text: "Cannot be undone",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#ED1C24',
+                    confirmButtonText: 'Delete'
+                }).then(async (result) => {
+                    if (result.isConfirmed) {
+                        try {
+                            const res = await fetch(`/master/nozzle/${id}/delete`, { method: 'POST' });
+                            const data = await res.json();
+                            if (data.status) {
+                                // Remove from local array without closing modal
+                                this.currentTiang.nozzles = this.currentTiang.nozzles.filter(n => n.id !== id);
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'Deleted!',
+                                    text: 'Nozzle deleted.',
+                                    timer: 1500,
+                                    showConfirmButton: false,
+                                    toast: true,
+                                    position: 'top-end'
+                                });
+                            } else {
+                                Swal.fire('Error', data.message, 'error');
+                            }
+                        } catch (e) {
+                            Swal.fire('Error', 'Failed to delete nozzle', 'error');
+                        }
+                    }
+                })
+            },
+
+            deleteTiang(id) {
+                Swal.fire({
+                    title: 'Are you sure?',
+                    text: "You won't be able to revert this!",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#ED1C24',
+                    cancelButtonColor: '#475569',
+                    confirmButtonText: 'Yes, delete it!'
+                }).then(async (result) => {
+                    if (result.isConfirmed) {
+                        try {
+                            const res = await fetch(`/master/tiang/${id}/delete`, { method: 'POST' });
+                            const data = await res.json();
+                            if (data.status) {
+                                Swal.fire('Deleted!', 'Tiang has been deleted.', 'success').then(() => location.reload());
+                            } else {
+                                Swal.fire('Error', data.message, 'error');
+                            }
+                        } catch (e) {
+                            Swal.fire('Error', 'Failed to delete Tiang', 'error');
+                        }
+                    }
+                })
+            }
+        }))
+    })
+</script>
+
+{{ template "footer.html" . }}
+{{ end }}

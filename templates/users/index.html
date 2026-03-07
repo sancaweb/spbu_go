@@ -1,0 +1,604 @@
+{{ define "users/index.html" }}
+{{ template "header.html" . }}
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-20">
+    <!-- LEFT COLUMN: USER MANAGEMENT -->
+    <div x-data="userManagement()">
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h2 class="text-2xl font-bold text-slate-800">Users</h2>
+                <p class="text-sm text-slate-500">Manage system access</p>
+            </div>
+            <button @click="openCreateModal()" class="px-3 py-1.5 glass-card hover:bg-white/80 transition text-[#005596] font-semibold rounded-lg flex items-center gap-2 border border-[#005596]/20 text-sm">
+                <span>+</span> Add User
+            </button>
+        </div>
+
+        <div class="glass-card rounded-2xl overflow-hidden shadow-lg min-h-[400px]">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-xs font-bold">
+                        <tr>
+                            <th class="p-3">Name</th>
+                            <th class="p-3">Role</th>
+                            <th class="p-3 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {{ range .Users }}
+                        <tr class="hover:bg-slate-50/50 transition duration-150">
+                            <td class="p-3">
+                                <div class="font-medium text-slate-800">{{ .FullName }}</div>
+                                <div class="text-xs text-slate-500">{{ .Username }}</div>
+                            </td>
+                            <td class="p-3">
+                                <span class="px-2 py-0.5 rounded-full bg-blue-50 text-[#005596] border border-blue-100 text-[10px] font-bold uppercase">
+                                    {{ .Role.Name }}
+                                </span>
+                            </td>
+                            <td class="p-3 text-right space-x-1">
+                                <button @click="openEditModal({id: {{.ID}}, first_name: '{{.FirstName}}', last_name: '{{.LastName}}', username: '{{.Username}}', email: '{{.Email}}', phone: '{{.Phone}}', is_active: {{.IsActive}}, role_id: {{.RoleID}} })" 
+                                        class="text-amber-500 hover:text-amber-600 transition p-1 hover:bg-amber-50 rounded">✏️</button>
+                                <button @click="deleteUser({{ .ID }})" 
+                                        class="text-[#ED1C24] hover:text-red-700 transition p-1 hover:bg-red-50 rounded">🗑️</button>
+                            </td>
+                        </tr>
+                        {{ end }}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- User Modals -->
+        <!-- Create User Modal -->
+        <div x-show="isCreateOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm" style="display: none;">
+            <div class="glass-card bg-white p-6 rounded-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto relative z-10 shadow-2xl">
+                <h3 class="text-lg font-bold mb-4 text-slate-800">Add User</h3>
+                <form @submit.prevent="createUser">
+                    <div class="space-y-3">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium mb-1 text-slate-600">First Name</label>
+                                <input type="text" x-model="createForm.first_name" class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] outline-none text-sm" required>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium mb-1 text-slate-600">Last Name</label>
+                                <input type="text" x-model="createForm.last_name" class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] outline-none text-sm">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium mb-1 text-slate-600">Username</label>
+                            <input type="text" x-model="createForm.username" class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] outline-none text-sm" required>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium mb-1 text-slate-600">Email</label>
+                            <input type="email" x-model="createForm.email" class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] outline-none text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium mb-1 text-slate-600">Phone</label>
+                            <input type="text" x-model="createForm.phone" class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] outline-none text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium mb-1 text-slate-600">Password</label>
+                            <input type="password" x-model="createForm.password" class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] outline-none text-sm" required>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium mb-1 text-slate-600">Confirm Password</label>
+                            <input type="password" x-model="createForm.confirm_password" class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] outline-none text-sm" required>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium mb-1 text-slate-600">Role</label>
+                            <select x-model="createForm.role_id" class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] outline-none text-sm" required>
+                                <option value="">Select Role...</option>
+                                {{ range .Roles }}
+                                <option value="{{ .ID }}">{{ .Name }}</option>
+                                {{ end }}
+                            </select>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" x-model="createForm.is_active" id="create_is_active" class="rounded border-slate-300 text-[#005596] focus:ring-[#005596]">
+                            <label for="create_is_active" class="text-xs font-medium text-slate-600">Active</label>
+                        </div>
+                    </div>
+                    <div class="flex justify-end gap-2 mt-6">
+                        <button type="button" @click="isCreateOpen = false" class="px-3 py-1.5 rounded text-slate-600 hover:bg-slate-100 text-sm">Cancel</button>
+                        <button type="submit" class="px-3 py-1.5 bg-[#509E2F] hover:bg-green-700 text-white rounded font-bold shadow hover:shadow-lg text-sm">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Edit User Modal -->
+        <div x-show="isEditOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm" style="display: none;">
+            <div class="glass-card bg-white p-6 rounded-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto relative z-10 shadow-2xl">
+                <h3 class="text-lg font-bold mb-4 text-slate-800">Edit User</h3>
+                <form @submit.prevent="updateUser">
+                    <div class="space-y-3">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium mb-1 text-slate-600">First Name</label>
+                                <input type="text" x-model="editForm.first_name" class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] outline-none text-sm" required>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium mb-1 text-slate-600">Last Name</label>
+                                <input type="text" x-model="editForm.last_name" class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] outline-none text-sm">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium mb-1 text-slate-600">Username</label>
+                            <input type="text" x-model="editForm.username" class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] outline-none text-sm" required>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium mb-1 text-slate-600">Email</label>
+                            <input type="email" x-model="editForm.email" class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] outline-none text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium mb-1 text-slate-600">Phone</label>
+                            <input type="text" x-model="editForm.phone" class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] outline-none text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium mb-1 text-slate-600">Password (Leave blank to keep)</label>
+                            <input type="password" x-model="editForm.password" class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] outline-none text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium mb-1 text-slate-600">Confirm Password</label>
+                            <input type="password" x-model="editForm.confirm_password" class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] outline-none text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium mb-1 text-slate-600">Role</label>
+                            <select x-model="editForm.role_id" class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] outline-none text-sm" required>
+                                <option value="">Select Role...</option>
+                                {{ range .Roles }}
+                                <option value="{{ .ID }}">{{ .Name }}</option>
+                                {{ end }}
+                            </select>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" x-model="editForm.is_active" id="edit_is_active" class="rounded border-slate-300 text-[#005596] focus:ring-[#005596]">
+                            <label for="edit_is_active" class="text-xs font-medium text-slate-600">Active</label>
+                        </div>
+                    </div>
+                    <div class="flex justify-end gap-2 mt-6">
+                        <button type="button" @click="isEditOpen = false" class="px-3 py-1.5 rounded text-slate-600 hover:bg-slate-100 text-sm">Cancel</button>
+                        <button type="submit" class="px-3 py-1.5 bg-[#005596] hover:bg-blue-800 text-white rounded font-bold shadow hover:shadow-lg text-sm">Update</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- RIGHT COLUMN: ROLE MANAGEMENT -->
+    <div x-data="roleManagement()">
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h2 class="text-2xl font-bold text-slate-800">Roles</h2>
+                <p class="text-sm text-slate-500">Manage permissions</p>
+            </div>
+            <button @click="openCreateModal()" class="px-3 py-1.5 glass-card hover:bg-white/80 transition text-[#005596] font-semibold rounded-lg flex items-center gap-2 border border-[#005596]/20 text-sm">
+                <span>+</span> Add Role
+            </button>
+        </div>
+
+        <div class="glass-card rounded-2xl overflow-hidden shadow-lg min-h-[400px]">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-xs font-bold">
+                        <tr>
+                            <th class="p-3">Name</th>
+                            <th class="p-3">Permissions</th>
+                            <th class="p-3 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {{ range .Roles }}
+                        <tr class="hover:bg-slate-50/50 transition duration-150">
+                            <td class="p-3">
+                                <div class="font-medium text-slate-800">{{ .Name }}</div>
+                                <div class="font-mono text-[10px] text-slate-500">{{ .Code }}</div>
+                            </td>
+                            <td class="p-3">
+                                <div class="flex flex-wrap gap-1">
+                                    {{ range .Permissions }}
+                                    <span class="px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-600 border border-purple-100 text-[10px] font-bold">{{ .Name }}</span>
+                                    {{ end }}
+                                </div>
+                            </td>
+                            <td class="p-3 text-right space-x-1">
+                                <button @click="openEditModal({id: {{.ID}}, name: '{{.Name}}', code: '{{.Code}}'})" 
+                                        class="text-amber-500 hover:text-amber-600 transition p-1 hover:bg-amber-50 rounded">✏️</button>
+                                <button @click="openPermissionModal({id: {{.ID}}, name: '{{.Name}}', permissions: [{{ range .Permissions }}{id: {{.ID}}, name: '{{.Name}}'},{{ end }}] })" 
+                                        class="text-blue-500 hover:text-blue-600 transition p-1 hover:bg-blue-50 rounded" title="Manage Permissions">🔑</button>
+                                <button @click="deleteRole({{ .ID }})" 
+                                        class="text-[#ED1C24] hover:text-red-700 transition p-1 hover:bg-red-50 rounded">🗑️</button>
+                            </td>
+                        </tr>
+                        {{ end }}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Role Modals -->
+        <!-- Create Role Modal -->
+        <div x-show="isCreateOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm" style="display: none;">
+            <div class="glass-card bg-white p-6 rounded-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto relative z-10 shadow-2xl">
+                <h3 class="text-lg font-bold mb-4 text-slate-800">Add Role</h3>
+                <form @submit.prevent="createRole">
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-medium mb-1 text-slate-600">Name</label>
+                            <input type="text" x-model="createForm.name" class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] outline-none text-sm" required>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium mb-1 text-slate-600">Code</label>
+                            <input type="text" x-model="createForm.code" class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] outline-none text-sm" required placeholder="admin">
+                        </div>
+                    </div>
+                    <div class="flex justify-end gap-2 mt-6">
+                        <button type="button" @click="isCreateOpen = false" class="px-3 py-1.5 rounded text-slate-600 hover:bg-slate-100 text-sm">Cancel</button>
+                        <button type="submit" class="px-3 py-1.5 bg-[#509E2F] hover:bg-green-700 text-white rounded font-bold shadow hover:shadow-lg text-sm">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Edit Role Modal -->
+        <div x-show="isEditOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm" style="display: none;">
+            <div class="glass-card bg-white p-6 rounded-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto relative z-10 shadow-2xl">
+                <h3 class="text-lg font-bold mb-4 text-slate-800">Edit Role</h3>
+                <form @submit.prevent="updateRole">
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-medium mb-1 text-slate-600">Name</label>
+                            <input type="text" x-model="editForm.name" class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] outline-none text-sm" required>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium mb-1 text-slate-600">Code</label>
+                            <input type="text" x-model="editForm.code" class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] outline-none text-sm" required>
+                        </div>
+                    </div>
+                    <div class="flex justify-end gap-2 mt-6">
+                        <button type="button" @click="isEditOpen = false" class="px-3 py-1.5 rounded text-slate-600 hover:bg-slate-100 text-sm">Cancel</button>
+                        <button type="submit" class="px-3 py-1.5 bg-[#005596] hover:bg-blue-800 text-white rounded font-bold shadow hover:shadow-lg text-sm">Update</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Manage Permissions Modal -->
+        <div x-show="isPermissionOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm" style="display: none;">
+            <div class="glass-card bg-white p-6 rounded-2xl w-full max-w-md relative z-10 shadow-2xl max-h-[80vh] flex flex-col">
+                <h3 class="text-lg font-bold mb-4 text-slate-800">Manage Permissions: <span x-text="permissionForm.roleName" class="text-[#005596]"></span></h3>
+                
+                <div class="overflow-y-auto flex-1 mb-4 pr-2">
+                    <div class="space-y-2">
+                        {{ range .Permissions }}
+                        <label class="flex items-center p-2 rounded hover:bg-slate-50 border border-transparent hover:border-slate-200 cursor-pointer transition">
+                            <input type="checkbox" value="{{ .ID }}" x-model="permissionForm.selectedPermissions" class="w-4 h-4 text-[#005596] rounded border-slate-300 focus:ring-[#005596]">
+                            <span class="ml-3 text-sm text-slate-700 capitalize">{{ .Name }}</span>
+                        </label>
+                        {{ end }}
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-4 border-t border-slate-100">
+                    <button type="button" @click="isPermissionOpen = false" class="px-3 py-1.5 rounded text-slate-600 hover:bg-slate-100 text-sm">Cancel</button>
+                    <button @click="updatePermissions" :disabled="isSubmitting" class="px-3 py-1.5 bg-[#005596] hover:bg-blue-800 text-white rounded font-bold shadow hover:shadow-lg text-sm flex items-center">
+                        <span x-show="isSubmitting" class="spinner mr-2 w-4 h-4 border-2 !border-white !border-l-transparent"></span>
+                        <span x-text="isSubmitting ? 'Saving...' : 'Save Permissions'"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('alpine:init', () => {
+        // User Management Data
+        Alpine.data('userManagement', () => ({
+            isLoading: false,
+            isSubmitting: false,
+            
+            // Create
+            isCreateOpen: false,
+            createForm: { name: '', username: '', password: '', role_id: '' },
+
+            // Edit
+            isEditOpen: false,
+            editForm: { id: null, name: '', username: '', password: '', role_id: '' },
+
+            init() {
+                // Simulate loading
+                this.isLoading = true;
+                setTimeout(() => {
+                    this.isLoading = false;
+                }, 500);
+            },
+
+            // Create Modal Actions
+            openCreateModal() {
+                this.createForm = { first_name: '', last_name: '', username: '', email: '', phone: '', password: '', confirm_password: '', role_id: '', is_active: true };
+                this.isCreateOpen = true;
+            },
+
+            // Edit Modal Actions
+            openEditModal(user) {
+                this.editForm = {
+                    id: user.id,
+                    first_name: user.first_name,
+                    last_name: user.last_name,
+                    username: user.username,
+                    email: user.email || '',
+                    phone: user.phone || '',
+                    password: '',
+                    confirm_password: '',
+                    is_active: user.is_active,
+                    role_id: user.role_id
+                };
+                this.isEditOpen = true;
+            },
+
+            // Submit Create
+            async createUser() {
+                if (this.createForm.password !== this.createForm.confirm_password) {
+                    Swal.fire({ icon: 'warning', title: 'Password Mismatch', text: 'Password dan Confirm Password tidak sama.' });
+                    return;
+                }
+                this.isSubmitting = true;
+                
+                const formData = new URLSearchParams();
+                formData.append('first_name', this.createForm.first_name);
+                formData.append('last_name', this.createForm.last_name);
+                formData.append('username', this.createForm.username);
+                formData.append('email', this.createForm.email);
+                formData.append('phone', this.createForm.phone);
+                formData.append('password', this.createForm.password);
+                formData.append('role_id', this.createForm.role_id);
+                if (this.createForm.is_active) formData.append('is_active', 'on');
+
+                try {
+                    const res = await fetch('/users', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: formData
+                    });
+                    const data = await res.json();
+                    
+                    if (data.status) {
+                        this.isCreateOpen = false;
+                        Swal.fire({
+                            title: '<strong>Success!</strong>',
+                            html: `<div class="text-slate-600 mb-2">${data.message}</div>`,
+                            icon: 'success',
+                            confirmButtonColor: '#005596'
+                        }).then(() => location.reload());
+                    } else {
+                        Swal.fire({ icon: 'error', title: 'Error', text: data.message });
+                    }
+                } catch (e) {
+                    Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to create user' });
+                } finally {
+                    this.isSubmitting = false;
+                }
+            },
+
+            // Submit Update
+            async updateUser() {
+                if (this.editForm.password && this.editForm.password !== this.editForm.confirm_password) {
+                    Swal.fire({ icon: 'warning', title: 'Password Mismatch', text: 'Password dan Confirm Password tidak sama.' });
+                    return;
+                }
+                this.isSubmitting = true;
+                
+                const formData = new URLSearchParams();
+                formData.append('first_name', this.editForm.first_name);
+                formData.append('last_name', this.editForm.last_name);
+                formData.append('username', this.editForm.username);
+                formData.append('email', this.editForm.email);
+                formData.append('phone', this.editForm.phone);
+                if (this.editForm.password) formData.append('password', this.editForm.password);
+                formData.append('role_id', this.editForm.role_id);
+                if (this.editForm.is_active) formData.append('is_active', 'on');
+
+                try {
+                    const res = await fetch(`/users/${this.editForm.id}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: formData
+                    });
+                    const data = await res.json();
+                    
+                    if (data.status) {
+                        this.isEditOpen = false;
+                        Swal.fire({
+                            title: '<strong>Updated!</strong>',
+                            html: `<div class="text-slate-600 mb-2">${data.message}</div>`,
+                            icon: 'success',
+                            confirmButtonColor: '#005596'
+                        }).then(() => location.reload());
+                    } else {
+                        Swal.fire({ icon: 'error', title: 'Error', text: data.message });
+                    }
+                } catch (e) {
+                    Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to update user' });
+                } finally {
+                    this.isSubmitting = false;
+                }
+            },
+
+            // Delete User
+            deleteUser(id) {
+                Swal.fire({
+                    title: 'Delete User?',
+                    text: 'Cannot be undone',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#ED1C24',
+                    confirmButtonText: 'Delete'
+                }).then(async (result) => {
+                    if (result.isConfirmed) {
+                        try {
+                            const res = await fetch(`/users/${id}/delete`, { method: 'POST' });
+                            const data = await res.json();
+                            if (data.status) {
+                                Swal.fire('Deleted!', 'User deleted.', 'success').then(() => location.reload());
+                            } else {
+                                Swal.fire('Error', data.message, 'error');
+                            }
+                        } catch (e) {
+                            Swal.fire('Error', 'Failed to delete user', 'error');
+                        }
+                    }
+                })
+            }
+        }));
+
+        // Role Management Data
+        Alpine.data('roleManagement', () => ({
+            isCreateOpen: false,
+            isEditOpen: false,
+            isPermissionOpen: false,
+            isSubmitting: false,
+            createForm: { name: '', code: '' },
+            editForm: { id: null, name: '', code: '' },
+            permissionForm: { roleId: null, roleName: '', selectedPermissions: [] },
+
+            openCreateModal() {
+                this.createForm = { name: '', code: '' };
+                this.isCreateOpen = true;
+            },
+            openEditModal(role) {
+                this.editForm = { ...role };
+                this.isEditOpen = true;
+            },
+            
+            openPermissionModal(role) {
+                this.permissionForm = {
+                    roleId: role.id,
+                    roleName: role.name,
+                    // Map existing permissions to their IDs (as strings for checkbox model)
+                    selectedPermissions: role.permissions.map(p => p.id.toString())
+                };
+                this.isPermissionOpen = true;
+            },
+
+            async createRole() {
+                const formData = new URLSearchParams();
+                formData.append('name', this.createForm.name);
+                formData.append('code', this.createForm.code);
+
+                try {
+                    const res = await fetch('/roles', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: formData
+                    });
+                    const data = await res.json();
+                    if (data.status) {
+                        this.isCreateOpen = false;
+                        Swal.fire({
+                            title: '<strong>Success!</strong>',
+                            html: `<div class="text-slate-600 mb-2">${data.message}</div>`,
+                            icon: 'success',
+                            confirmButtonColor: '#005596'
+                        }).then(() => location.reload());
+                    } else {
+                        Swal.fire({ icon: 'error', title: 'Error', text: data.message });
+                    }
+                } catch (e) {
+                    Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to create role' });
+                }
+            },
+            async updateRole() {
+                const formData = new URLSearchParams();
+                formData.append('name', this.editForm.name);
+                formData.append('code', this.editForm.code);
+
+                try {
+                    const res = await fetch(`/roles/${this.editForm.id}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: formData
+                    });
+                    const data = await res.json();
+                    if (data.status) {
+                        this.isEditOpen = false;
+                        Swal.fire({
+                            title: '<strong>Updated!</strong>',
+                            html: `<div class="text-slate-600 mb-2">${data.message}</div>`,
+                            icon: 'success',
+                            confirmButtonColor: '#005596'
+                        }).then(() => location.reload());
+                    } else {
+                        Swal.fire({ icon: 'error', title: 'Error', text: data.message });
+                    }
+                } catch (e) {
+                    Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to update role' });
+                }
+            },
+            
+            async updatePermissions() {
+                this.isSubmitting = true;
+                const formData = new URLSearchParams();
+                
+                // Append separate values for array (standard form submission)
+                this.permissionForm.selectedPermissions.forEach(id => {
+                    formData.append('permissions[]', id);
+                });
+
+                try {
+                    const res = await fetch(`/roles/${this.permissionForm.roleId}/permissions`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: formData
+                    });
+                    const data = await res.json();
+                    if (data.status) {
+                        this.isPermissionOpen = false;
+                        Swal.fire({
+                            title: '<strong>Success!</strong>',
+                            html: `<div class="text-slate-600 mb-2">${data.message}</div>`,
+                            icon: 'success',
+                            confirmButtonColor: '#005596'
+                        }).then(() => location.reload());
+                    } else {
+                        Swal.fire({ icon: 'error', title: 'Error', text: data.message });
+                    }
+                } catch (e) {
+                    Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to update permissions' });
+                } finally {
+                    this.isSubmitting = false;
+                }
+            },
+
+            deleteRole(id) {
+                Swal.fire({
+                    title: 'Delete Role?',
+                    text: 'Cannot be undone',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#ED1C24',
+                    confirmButtonText: 'Delete'
+                }).then(async (result) => {
+                    if (result.isConfirmed) {
+                        try {
+                            const res = await fetch(`/roles/${id}/delete`, { method: 'POST' });
+                            const data = await res.json();
+                            if (data.status) {
+                                Swal.fire('Deleted!', 'Role deleted.', 'success').then(() => location.reload());
+                            } else {
+                                Swal.fire('Error', data.message, 'error');
+                            }
+                        } catch (e) {
+                            Swal.fire('Error', 'Failed to delete role', 'error');
+                        }
+                    }
+                })
+            }
+        }));
+    })
+</script>
+
+{{ template "footer.html" . }}
+{{ end }}

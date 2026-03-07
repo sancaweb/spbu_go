@@ -1,0 +1,367 @@
+{{ define "master/bbm/index.html" }}
+{{ template "header.html" . }}
+
+<div x-data="bbmManagement()">
+    <div class="flex justify-between items-center mb-6">
+        <div>
+            <h2 class="text-3xl font-bold text-slate-800">BBM Management</h2>
+            <p class="text-slate-500">Manage fuel types, prices, and stock</p>
+        </div>
+        <button @click="openCreateModal()" class="px-4 py-2 glass-card hover:bg-white/80 transition text-[#005596] font-semibold rounded-lg flex items-center gap-2 border border-[#005596]/20">
+            <span>+</span> Add BBM
+        </button>
+    </div>
+
+    <!-- BBM Table -->
+    <div class="glass-card rounded-2xl overflow-hidden shadow-lg min-h-[400px]">
+        <div class="overflow-x-auto">
+            <template x-if="isLoading">
+                <div class="p-4 space-y-4">
+                    <div class="h-10 skeleton w-full"></div>
+                    <div class="h-10 skeleton w-full"></div>
+                    <div class="h-10 skeleton w-full"></div>
+                </div>
+            </template>
+            <table class="w-full text-left" x-show="!isLoading">
+                <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-xs font-bold">
+                    <tr>
+                        <th class="p-4">Name</th>
+                        <th class="p-4">Price</th>
+                        <th class="p-4">Margin</th>
+                        <th class="p-4">Stock (L)</th>
+                        <th class="p-4">Status</th>
+                        <th class="p-4 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {{ range .BBMs }}
+                    <tr class="hover:bg-slate-50/50 transition duration-150">
+                        <td class="p-4 font-medium text-slate-800">{{ .Name }}</td>
+                        <td class="p-4 font-mono text-slate-600" x-text="formatIDR({{ .Price }})"></td>
+                        <td class="p-4 font-mono text-slate-500" x-text="formatIDR({{ .Margin }})"></td>
+                        <td class="p-4 font-mono text-slate-500" x-text="formatStock({{ .Stock }})"></td>
+                        <td class="p-4">
+                            {{ if .IsActive }}
+                            <span class="px-2 py-1 rounded-full bg-green-50 text-green-600 border border-green-100 text-xs font-bold">Active</span>
+                            {{ else }}
+                            <span class="px-2 py-1 rounded-full bg-slate-50 text-slate-500 border border-slate-200 text-xs font-bold">Inactive</span>
+                            {{ end }}
+                        </td>
+                        <td class="p-4 text-right space-x-2">
+                            <button @click="openEditModal({id: {{.ID}}, name: '{{.Name}}', price: {{.Price}}, margin: {{.Margin}}, stock: {{.Stock}}, reward_percent: {{.RewardPercent}}, is_active: {{.IsActive}} })" 
+                                    class="text-amber-500 hover:text-amber-600 transition p-1 hover:bg-amber-50 rounded">
+                                ✏️
+                            </button>
+                            <button @click="deleteBBM({{ .ID }})" 
+                                    class="text-[#ED1C24] hover:text-red-700 transition p-1 hover:bg-red-50 rounded">
+                                🗑️
+                            </button>
+                        </td>
+                    </tr>
+                    {{ end }}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Create/Edit Modal -->
+    <div x-show="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm" style="display: none;">
+        <div class="glass-card bg-white p-8 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto relative z-10 shadow-2xl">
+            <h3 class="text-xl font-bold mb-4 text-slate-800" x-text="isEdit ? 'Edit BBM' : 'Add New BBM'"></h3>
+            <form @submit.prevent="submitForm">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1 text-slate-600">Name</label>
+                        <input type="text" x-model="form.name" class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none" required>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-slate-600">Price</label>
+                            <input type="text" x-model="form.priceDisplay" 
+                                   @input="liveFormat($event, 'idr')"
+                                   @focus="$event.target.select()"
+                                   class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-slate-600">Margin</label>
+                            <input type="text" x-model="form.marginDisplay" 
+                                   @input="liveFormat($event, 'idr')"
+                                   @focus="$event.target.select()"
+                                   class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none" required>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-slate-600">Stock</label>
+                            <input type="text" x-model="form.stockDisplay" 
+                                   @input="liveFormat($event, 'stock')"
+                                   @focus="$event.target.select()"
+                                   class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-slate-600">Reward %</label>
+                            <input type="text" x-model="form.rewardDisplay" 
+                                   @input="liveFormat($event, 'decimal')"
+                                   @focus="$event.target.select()"
+                                   class="w-full p-2 rounded border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none" required>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" id="is_active" x-model="form.is_active" class="w-4 h-4 rounded text-[#005596] focus:ring-[#005596]">
+                        <label for="is_active" class="text-sm font-medium text-slate-600">Is Active</label>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 mt-6">
+                    <button type="button" @click="isOpen = false" class="px-4 py-2 rounded text-slate-600 hover:bg-slate-100 transition">Cancel</button>
+                    <button type="submit" :disabled="isSubmitting" class="px-4 py-2 bg-[#005596] hover:bg-blue-800 text-white rounded font-medium shadow-lg hover:shadow-xl transition transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center">
+                        <span x-show="isSubmitting" class="spinner mr-2 w-4 h-4 border-2 !border-white !border-l-transparent"></span>
+                        <span x-text="isSubmitting ? 'Saving...' : 'Save'"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('bbmManagement', () => ({
+            isLoading: false,
+            isSubmitting: false,
+            isOpen: false,
+            isEdit: false,
+            decimalPlaces: {{ .StockDecimalPlaces }},
+            form: {
+                id: null,
+                name: '',
+                priceDisplay: '0',
+                marginDisplay: '0',
+                stockDisplay: '0',
+                rewardDisplay: '0',
+                is_active: true
+            },
+
+            // === Indonesian Number Formatting Helpers ===
+
+            // Format a raw number to Indonesian display: 1234567 -> "1.234.567"
+            formatIDR(value) {
+                return Number(value).toLocaleString('id-ID');
+            },
+
+            // Format raw integer stock to Indonesian decimal display
+            // e.g. rawValue=123456, decimalPlaces=2 -> "1.234,56"
+            formatStock(rawValue) {
+                const divisor = Math.pow(10, this.decimalPlaces);
+                const result = rawValue / divisor;
+                return result.toLocaleString('id-ID', {
+                    minimumFractionDigits: this.decimalPlaces,
+                    maximumFractionDigits: this.decimalPlaces
+                });
+            },
+
+            // Add thousands separators to a digit string: "1234567" -> "1.234.567"
+            _addThousands(digits) {
+                if (!digits) return '0';
+                let result = '';
+                let count = 0;
+                for (let i = digits.length - 1; i >= 0; i--) {
+                    if (count > 0 && count % 3 === 0) result = '.' + result;
+                    result = digits[i] + result;
+                    count++;
+                }
+                return result;
+            },
+
+            // Live format with cursor position preservation
+            _formatting: false,
+            liveFormat(event, type) {
+                if (this._formatting) return;
+                this._formatting = true;
+
+                const el = event.target;
+                const oldVal = el.value;
+                const cursorPos = el.selectionStart;
+
+                // Count separators (dots) before cursor in old value
+                const dotsBeforeCursorOld = (oldVal.substring(0, cursorPos).match(/\./g) || []).length;
+                // Position in "raw" characters (without dots)
+                const rawCursorPos = cursorPos - dotsBeforeCursorOld;
+
+                let newVal;
+                if (type === 'idr') {
+                    const raw = oldVal.replace(/[^\d]/g, '');
+                    newVal = this._addThousands(raw || '0');
+                } else if (type === 'stock') {
+                    let cleaned = oldVal.replace(/[^\d,]/g, '');
+                    const parts = cleaned.split(',');
+                    let intPart = parts[0] || '0';
+                    const formattedInt = this._addThousands(intPart);
+                    if (parts.length > 1) {
+                        newVal = formattedInt + ',' + parts[1].substring(0, this.decimalPlaces);
+                    } else if (oldVal.endsWith(',') && this.decimalPlaces > 0) {
+                        newVal = formattedInt + ',';
+                    } else {
+                        newVal = formattedInt;
+                    }
+                } else if (type === 'decimal') {
+                    let cleaned = oldVal.replace(/[^\d,]/g, '');
+                    const parts = cleaned.split(',');
+                    let intPart = parts[0] || '0';
+                    if (parts.length > 1) {
+                        newVal = intPart + ',' + parts[1].substring(0, 2);
+                    } else if (oldVal.endsWith(',')) {
+                        newVal = intPart + ',';
+                    } else {
+                        newVal = intPart;
+                    }
+                }
+
+                // Update Alpine model via the x-model attribute
+                const modelAttr = el.getAttribute('x-model');
+                if (modelAttr) {
+                    const keys = modelAttr.split('.');
+                    if (keys.length === 2) {
+                        this[keys[0]][keys[1]] = newVal;
+                    }
+                }
+
+                // Calculate new cursor position
+                let rawCount = 0;
+                let newCursor = 0;
+                for (let i = 0; i < newVal.length; i++) {
+                    if (newVal[i] !== '.') {
+                        rawCount++;
+                    }
+                    newCursor = i + 1;
+                    if (rawCount >= rawCursorPos) break;
+                }
+
+                // Restore cursor position
+                requestAnimationFrame(() => {
+                    el.setSelectionRange(newCursor, newCursor);
+                    this._formatting = false;
+                });
+            },
+
+            // Parse Indonesian formatted string to raw number: "1.234.567" -> 1234567
+            parseIDR(val) {
+                if (typeof val === 'number') return val;
+                const cleaned = String(val).replace(/\./g, '').replace(',', '.');
+                return parseFloat(cleaned) || 0;
+            },
+
+            init() {
+                this.isLoading = true;
+                setTimeout(() => this.isLoading = false, 500);
+            },
+
+            openCreateModal() {
+                this.isEdit = false;
+                this.form = {
+                    id: null,
+                    name: '',
+                    priceDisplay: '0',
+                    marginDisplay: '0',
+                    stockDisplay: '0',
+                    rewardDisplay: '0',
+                    is_active: true
+                };
+                this.isOpen = true;
+            },
+
+            openEditModal(bbm) {
+                this.isEdit = true;
+                const divisor = Math.pow(10, this.decimalPlaces);
+                const stockValue = bbm.stock / divisor;
+                this.form = {
+                    id: bbm.id,
+                    name: bbm.name,
+                    priceDisplay: Number(bbm.price).toLocaleString('id-ID'),
+                    marginDisplay: Number(bbm.margin).toLocaleString('id-ID'),
+                    stockDisplay: stockValue.toLocaleString('id-ID', {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: this.decimalPlaces
+                    }),
+                    rewardDisplay: String(bbm.reward_percent).replace('.', ','),
+                    is_active: bbm.is_active
+                };
+                this.isOpen = true;
+            },
+
+            async submitForm() {
+                this.isSubmitting = true;
+
+                // Parse Indonesian formatted values back to raw numbers
+                const price = this.parseIDR(this.form.priceDisplay);
+                const margin = this.parseIDR(this.form.marginDisplay);
+                const stock = this.parseIDR(this.form.stockDisplay);
+                const rewardPercent = this.parseIDR(this.form.rewardDisplay);
+
+                const formData = new URLSearchParams();
+                formData.append('name', this.form.name);
+                formData.append('price', price);
+                formData.append('margin', margin);
+                formData.append('stock', stock);
+                formData.append('reward_percent', rewardPercent);
+                if (this.form.is_active) formData.append('is_active', 'on');
+
+                const url = this.isEdit ? `/master/bbm/${this.form.id}` : '/master/bbm';
+                
+                try {
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: formData
+                    });
+                    const data = await res.json();
+                    
+                    if (data.status) {
+                        this.isOpen = false;
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Success!',
+                            text: data.message,
+                            timer: 1500,
+                            showConfirmButton: false
+                        }).then(() => location.reload());
+                    } else {
+                        Swal.fire({ icon: 'error', title: 'Error', text: data.message });
+                    }
+                } catch (e) {
+                    Swal.fire({ icon: 'error', title: 'Error', text: 'Something went wrong' });
+                } finally {
+                    this.isSubmitting = false;
+                }
+            },
+
+            deleteBBM(id) {
+                Swal.fire({
+                    title: 'Are you sure?',
+                    text: "You won't be able to revert this!",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#ED1C24',
+                    cancelButtonColor: '#475569',
+                    confirmButtonText: 'Yes, delete it!'
+                }).then(async (result) => {
+                    if (result.isConfirmed) {
+                        try {
+                            const res = await fetch(`/master/bbm/${id}/delete`, { method: 'POST' });
+                            const data = await res.json();
+                            if (data.status) {
+                                Swal.fire('Deleted!', 'BBM has been deleted.', 'success').then(() => location.reload());
+                            } else {
+                                Swal.fire('Error', data.message, 'error');
+                            }
+                        } catch (e) {
+                            Swal.fire('Error', 'Failed to delete BBM', 'error');
+                        }
+                    }
+                })
+            }
+        }))
+    })
+</script>
+
+{{ template "footer.html" . }}
+{{ end }}

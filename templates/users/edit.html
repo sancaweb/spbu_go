@@ -1,0 +1,37 @@
+{{ define "users/edit.html" }}
+{{ template "header.html" . }}
+
+<h2>Edit User</h2>
+
+<div class="card shadow mt-3">
+    <div class="card-body">
+        <form action="/users/{{ .User.ID }}" method="POST">
+            <div class="mb-3">
+                <label class="form-label">First Name</label>
+                <input type="text" name="first_name" class="form-control" value="{{ .User.FirstName }}" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Username</label>
+                <input type="text" name="username" class="form-control" value="{{ .User.Username }}" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Password (Leave blank to keep current)</label>
+                <input type="password" name="password" class="form-control">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Role</label>
+                <select name="role_id" class="form-select" required>
+                    <option value="">Select Role</option>
+                    {{ range .Roles }}
+                    <option value="{{ .ID }}" {{ if eq .ID $.User.RoleID }}selected{{ end }}>{{ .Name }}</option>
+                    {{ end }}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Update</button>
+            <a href="/users" class="btn btn-secondary">Cancel</a>
+        </form>
+    </div>
+</div>
+
+{{ template "footer.html" . }}
+{{ end }}

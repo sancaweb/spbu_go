@@ -1,0 +1,28 @@
+{{ define "roles/create.html" }}
+{{ template "header.html" . }}
+
+<h2>Create Role</h2>
+
+<div class="card shadow mt-3">
+    <div class="card-body">
+        {{ if .Error }}
+        <div class="alert alert-danger">{{ .Error }}</div>
+        {{ end }}
+
+        <form action="/roles" method="POST">
+            <div class="mb-3">
+                <label class="form-label">Name</label>
+                <input type="text" name="name" class="form-control" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Code</label>
+                <input type="text" name="code" class="form-control" required placeholder="e.g. manager">
+            </div>
+            <button type="submit" class="btn btn-success">Save</button>
+            <a href="/roles" class="btn btn-secondary">Cancel</a>
+        </form>
+    </div>
+</div>
+
+{{ template "footer.html" . }}
+{{ end }}

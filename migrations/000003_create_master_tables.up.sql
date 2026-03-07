@@ -1,0 +1,41 @@
+CREATE TABLE IF NOT EXISTS bbm (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    margin DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    price DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    stock DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    reward_percent DECIMAL(5, 2) NOT NULL DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_by INT NULL REFERENCES users(id) ON DELETE SET NULL,
+    deleted_at TIMESTAMP NULL
+);
+
+CREATE INDEX idx_bbm_deleted_at ON bbm(deleted_at);
+
+CREATE TABLE IF NOT EXISTS tiang (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) NOT NULL UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_by INT NULL REFERENCES users(id) ON DELETE SET NULL,
+    deleted_at TIMESTAMP NULL
+);
+
+CREATE INDEX idx_tiang_deleted_at ON tiang(deleted_at);
+
+CREATE TABLE IF NOT EXISTS nozzles (
+    id SERIAL PRIMARY KEY,
+    tiang_id INT NOT NULL REFERENCES tiang(id) ON DELETE CASCADE,
+    description VARCHAR(255),
+    bbm_id INT NOT NULL REFERENCES bbm(id) ON DELETE CASCADE,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_by INT NULL REFERENCES users(id) ON DELETE SET NULL,
+    deleted_at TIMESTAMP NULL
+);
+
+CREATE INDEX idx_nozzles_deleted_at ON nozzles(deleted_at);

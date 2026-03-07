@@ -1,0 +1,48 @@
+{{ define "home.html" }}
+{{ template "header.html" . }}
+
+<div class="mb-8">
+    <h2 class="text-3xl font-bold text-slate-800">Home</h2>
+    <p class="text-slate-500">Quick shortcuts to your modules</p>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <!-- Dashboard / Reports Shortcut -->
+    <a href="/dashboard" class="glass-card p-8 rounded-2xl group hover:border-[#005596]/30 transition duration-300 flex flex-col items-center text-center hover:-translate-y-1 block">
+        <div class="w-16 h-16 rounded-2xl bg-blue-50 text-[#005596] flex items-center justify-center text-3xl mb-4 group-hover:scale-110 transition shadow-sm">
+            📊
+        </div>
+        <h3 class="text-xl font-bold text-slate-800 mb-2">Sales Reports</h3>
+        <p class="text-slate-500 text-sm">View sales performance, transaction history, and fuel stock analytics.</p>
+        <div class="mt-6 text-[#005596] font-semibold text-sm flex items-center">
+            View Reports <span class="ml-2 group-hover:translate-x-1 transition">→</span>
+        </div>
+    </a>
+
+    <!-- Users Shortcut -->
+    <a href="/users" class="glass-card p-8 rounded-2xl group hover:border-[#509E2F]/30 transition duration-300 flex flex-col items-center text-center hover:-translate-y-1 block">
+        <div class="w-16 h-16 rounded-2xl bg-green-50 text-[#509E2F] flex items-center justify-center text-3xl mb-4 group-hover:scale-110 transition shadow-sm">
+            👥
+        </div>
+        <h3 class="text-xl font-bold text-slate-800 mb-2">User Management</h3>
+        <p class="text-slate-500 text-sm">Create users, manage accounts, and monitor system access.</p>
+        <div class="mt-6 text-[#509E2F] font-semibold text-sm flex items-center">
+            Manage Users <span class="ml-2 group-hover:translate-x-1 transition">→</span>
+        </div>
+    </a>
+
+    <!-- Roles Shortcut -->
+    <a href="/roles" class="glass-card p-8 rounded-2xl group hover:border-[#ED1C24]/30 transition duration-300 flex flex-col items-center text-center hover:-translate-y-1 block">
+        <div class="w-16 h-16 rounded-2xl bg-red-50 text-[#ED1C24] flex items-center justify-center text-3xl mb-4 group-hover:scale-110 transition shadow-sm">
+            🛡️
+        </div>
+        <h3 class="text-xl font-bold text-slate-800 mb-2">Role Management</h3>
+        <p class="text-slate-500 text-sm">Configure user roles, permissions, and security access levels.</p>
+        <div class="mt-6 text-[#ED1C24] font-semibold text-sm flex items-center">
+            Manage Roles <span class="ml-2 group-hover:translate-x-1 transition">→</span>
+        </div>
+    </a>
+</div>
+
+{{ template "footer.html" . }}
+{{ end }}

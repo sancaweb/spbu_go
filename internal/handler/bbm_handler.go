@@ -14,10 +14,11 @@ import (
 type BBMHandler struct {
 	service        service.BBMService
 	settingService service.SettingService
+	mappingService service.COAMappingService
 }
 
-func NewBBMHandler(service service.BBMService, settingService service.SettingService) *BBMHandler {
-	return &BBMHandler{service, settingService}
+func NewBBMHandler(service service.BBMService, settingService service.SettingService, mappingService service.COAMappingService) *BBMHandler {
+	return &BBMHandler{service, settingService, mappingService}
 }
 
 func (h *BBMHandler) getStockDecimalPlaces() int {
@@ -137,4 +138,29 @@ func (h *BBMHandler) Delete(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": true, "message": "BBM deleted successfully"})
+}
+
+// GenerateCOA auto-creates the standard COA accounts and mappings for the given BBM.
+func (h *BBMHandler) GenerateCOA(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	bbm, err := h.service.GetByID(uint(id))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"status": false, "message": "BBM tidak ditemukan"})
+		return
+	}
+
+	var createdBy *uint
+	if u, ok := c.Get("user"); ok {
+		if usr, ok := u.(entity.User); ok {
+			createdBy = &usr.ID
+		} else if usr, ok := u.(*entity.User); ok {
+			createdBy = &usr.ID
+		}
+	}
+
+	if err := h.mappingService.GenerateCOAForBBM(&bbm, createdBy); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": false, "message": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": true, "message": "COA dan mapping untuk " + bbm.Name + " berhasil dibuat"})
 }

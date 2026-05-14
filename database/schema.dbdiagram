@@ -1,0 +1,87 @@
+{
+  "version": "2.0.0",
+  "darkMode": true,
+  "gridEnabling": false,
+  "currentViewName": null,
+  "defaultView": {
+    "detailLevel": "All",
+    "tablePositions": [
+      {
+        "name": "roles",
+        "schemaName": "public",
+        "x": 375.970703125,
+        "y": 12
+      },
+      {
+        "name": "permissions",
+        "schemaName": "public",
+        "x": 375.970703125,
+        "y": 282
+      },
+      {
+        "name": "role_permissions",
+        "schemaName": "public",
+        "x": 913.27001953125,
+        "y": 474
+      },
+      {
+        "name": "users",
+        "schemaName": "public",
+        "x": 913.27001953125,
+        "y": 12
+      },
+      {
+        "name": "settings",
+        "schemaName": "public",
+        "x": 12,
+        "y": 12
+      },
+      {
+        "name": "bbm",
+        "schemaName": "public",
+        "x": 1448.1675472408194,
+        "y": -333.1807649507636
+      },
+      {
+        "name": "tiang",
+        "schemaName": "public",
+        "x": 1432.07861328125,
+        "y": 442
+      },
+      {
+        "name": "nozzles",
+        "schemaName": "public",
+        "x": 2029.583984375,
+        "y": 12
+      },
+      {
+        "name": "partners",
+        "schemaName": "public",
+        "x": 1432.07861328125,
+        "y": 744
+      },
+      {
+        "name": "jabatan",
+        "schemaName": "public",
+        "x": 375.970703125,
+        "y": 552
+      },
+      {
+        "name": "karyawan",
+        "schemaName": "public",
+        "x": 1432.07861328125,
+        "y": 1541
+      },
+      {
+        "name": "pendapatan",
+        "schemaName": "public",
+        "x": 1432.07861328125,
+        "y": 1142
+      }
+    ],
+    "tableGroupCollapseStates": [],
+    "stickyNoteLayouts": [],
+    "referencePaths": []
+  },
+  "views": {}
+}

@@ -1,0 +1,578 @@
+{{ define "partner/index.html" }} {{ template "header.html" . }}
+
+<div
+  class="space-y-6"
+  x-data="partnerManager()"
+  @open-detail.window="openDetailModal($event.detail.id, $event.detail.name, $event.detail.cp, $event.detail.ph, $event.detail.addr)"
+  @open-edit.window="openEditModal($event.detail.id, $event.detail.name, $event.detail.cp, $event.detail.ph, $event.detail.addr)"
+  @req-delete.window="confirmDelete($event.detail.id)"
+  @req-restore.window="confirmRestore($event.detail.id)"
+>
+  <!-- Header Section -->
+  <div
+    class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
+  >
+    <div>
+      <h2 class="text-2xl font-bold text-slate-800">{{ .Title }}</h2>
+      <p class="text-slate-500 text-sm mt-1">Kelola data partner perusahaan</p>
+    </div>
+    <div class="flex gap-2">
+      {{ if .IsArchive }}
+      <a
+        href="/master/partner"
+        class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors flex items-center gap-2"
+      >
+        <span>←</span> Kembali ke Data Aktif
+      </a>
+      {{ else }}
+      <a
+        href="/master/partner/archive"
+        class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors flex items-center gap-2"
+      >
+        <svg
+          class="w-4 h-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
+          ></path>
+        </svg>
+        Lihat Data Tidak Aktif
+      </a>
+      <button
+        @click="openCreateModal()"
+        class="px-4 py-2 bg-[#005596] hover:bg-blue-800 text-white rounded-lg font-bold shadow-lg shadow-blue-500/30 transition-all flex items-center gap-2"
+      >
+        <svg
+          class="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M12 4v16m8-8H4"
+          ></path>
+        </svg>
+        Tambah Partner
+      </button>
+      {{ end }}
+    </div>
+  </div>
+
+  <!-- Table Section -->
+  <div
+    class="glass-card bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"
+  >
+    <div class="p-6">
+      <div class="flex flex-col md:flex-row justify-between gap-4 mb-4">
+        <div class="relative w-full md:w-64">
+          <input
+            type="text"
+            id="searchInput"
+            placeholder="Cari partner..."
+            class="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none transition-all"
+          />
+          <svg
+            class="w-5 h-5 text-slate-400 absolute left-3 top-2.5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            ></path>
+          </svg>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse" id="partnerTable">
+          <thead>
+            <tr class="bg-slate-50 border-b border-slate-200">
+              <th class="p-4 font-semibold text-slate-600 text-sm">
+                Nama Partner
+              </th>
+              <th class="p-4 font-semibold text-slate-600 text-sm">
+                Contact Person
+              </th>
+              <th class="p-4 font-semibold text-slate-600 text-sm">Telepon</th>
+              <th class="p-4 font-semibold text-slate-600 text-sm text-right">
+                Aksi
+              </th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create/Edit Modal Reuse -->
+  <div
+    x-show="isOpen"
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm"
+    style="display: none"
+  >
+    <div
+      class="glass-card bg-white p-8 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto relative z-10 shadow-2xl"
+    >
+      <h3
+        class="text-xl font-bold mb-4 text-slate-800"
+        x-text="isEdit ? 'Edit Partner' : 'Add New Partner'"
+      ></h3>
+      <form @submit.prevent="submitForm">
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium mb-1 text-slate-600"
+              >Nama Perusahaan / Partner</label
+            >
+            <input
+              type="text"
+              x-model="form.name"
+              class="w-full p-2.5 rounded-lg border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none"
+              required
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1 text-slate-600"
+              >Contact Person (Opsional)</label
+            >
+            <input
+              type="text"
+              x-model="form.contact_person"
+              class="w-full p-2.5 rounded-lg border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1 text-slate-600"
+              >Nomor Telepon (Opsional)</label
+            >
+            <input
+              type="text"
+              x-model="form.phone"
+              class="w-full p-2.5 rounded-lg border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1 text-slate-600"
+              >Alamat Lengkap (Opsional)</label
+            >
+            <textarea
+              x-model="form.address"
+              rows="3"
+              class="w-full p-2.5 rounded-lg border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none"
+            ></textarea>
+          </div>
+        </div>
+        <div class="flex justify-end gap-3 mt-8">
+          <button
+            type="button"
+            @click="closeModal()"
+            class="px-4 py-2 rounded-lg font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+          >
+            Batal
+          </button>
+          <button
+            type="submit"
+            class="px-6 py-2 bg-[#005596] hover:bg-blue-800 text-white rounded-lg font-bold shadow-lg shadow-blue-500/30 transition-all flex items-center"
+            :disabled="isSubmitting"
+          >
+            <span
+              x-show="isSubmitting"
+              class="w-4 h-4 border-2 border-white border-l-transparent rounded-full animate-spin mr-2"
+            ></span>
+            <span x-text="isEdit ? 'Update Data' : 'Simpan Data'"></span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Detail Modal -->
+  <div
+    x-show="isDetailOpen"
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm"
+    style="display: none"
+  >
+    <div
+      class="glass-card bg-white p-8 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto relative z-10 shadow-2xl"
+    >
+      <h3 class="text-xl font-bold mb-6 text-slate-800 border-b pb-2">
+        Detail Partner
+      </h3>
+      <div class="space-y-4">
+        <div>
+          <label
+            class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1"
+            >Nama Perusahaan</label
+          >
+          <div
+            class="text-slate-800 font-medium text-base"
+            x-text="detailData.name || '-'"
+          ></div>
+        </div>
+        <div>
+          <label
+            class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1"
+            >Contact Person</label
+          >
+          <div
+            class="text-slate-800"
+            x-text="detailData.contact_person || '-'"
+          ></div>
+        </div>
+        <div>
+          <label
+            class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1"
+            >Telepon</label
+          >
+          <div class="text-slate-800" x-text="detailData.phone || '-'"></div>
+        </div>
+        <div>
+          <label
+            class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1"
+            >Alamat Logistik</label
+          >
+          <div
+            class="text-slate-800 whitespace-pre-wrap"
+            x-text="detailData.address || '-'"
+          ></div>
+        </div>
+      </div>
+      <div class="flex justify-end mt-8">
+        <button
+          type="button"
+          @click="isDetailOpen = false"
+          class="px-6 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg font-bold shadow-lg shadow-slate-500/30 transition-all"
+        >
+          Tutup
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function partnerManager() {
+    return {
+      isOpen: false,
+      isDetailOpen: false,
+      isEdit: false,
+      isSubmitting: false,
+      form: {
+        id: null,
+        name: "",
+        contact_person: "",
+        phone: "",
+        address: "",
+      },
+      detailData: {},
+
+      openCreateModal() {
+        this.isEdit = false;
+        this.form = {
+          id: null,
+          name: "",
+          contact_person: "",
+          phone: "",
+          address: "",
+        };
+        this.isOpen = true;
+      },
+
+      openEditModal(id, name, contact_person, phone, address) {
+        this.isEdit = true;
+        this.form = { id, name, contact_person, phone, address };
+        this.isOpen = true;
+      },
+
+      openDetailModal(id, name, contact_person, phone, address) {
+        this.detailData = { id, name, contact_person, phone, address };
+        this.isDetailOpen = true;
+      },
+
+      closeModal() {
+        this.isOpen = false;
+        if (!this.isSubmitting) {
+          this.form = {
+            id: null,
+            name: "",
+            contact_person: "",
+            phone: "",
+            address: "",
+          };
+        }
+      },
+
+      async submitForm() {
+        if (!this.form.name) return;
+
+        this.isSubmitting = true;
+
+        try {
+          const url = this.isEdit
+            ? `/master/partner/${this.form.id}`
+            : "/master/partner";
+          const formData = new FormData();
+          formData.append("name", this.form.name);
+          formData.append("contact_person", this.form.contact_person);
+          formData.append("phone", this.form.phone);
+          formData.append("address", this.form.address);
+
+          const response = await fetch(url, {
+            method: "POST",
+            body: formData,
+          });
+
+          const data = await response.json();
+
+          if (data.status) {
+            Swal.fire({
+              icon: "success",
+              title: "Berhasil!",
+              text: data.message,
+              timer: 1500,
+              showConfirmButton: false,
+            }).then(() => {
+              window.location.reload();
+            });
+          } else {
+            Swal.fire(
+              "Error",
+              data.message || "Terjadi kesalahan sistem",
+              "error",
+            );
+          }
+        } catch (error) {
+          console.error("Error submitting form:", error);
+          Swal.fire("Error", "Gagal menghubungi server", "error");
+        } finally {
+          this.isSubmitting = false;
+          this.closeModal();
+        }
+      },
+
+      confirmDelete(id) {
+        Swal.fire({
+          title: "Nonaktifkan Partner?",
+          text: "Partner ini tidak akan tersedia di menu transaksi setelah diarsipkan.",
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonColor: "#d33",
+          cancelButtonColor: "#3085d6",
+          confirmButtonText: "Ya, Nonaktifkan!",
+          cancelButtonText: "Batal",
+        }).then((result) => {
+          if (result.isConfirmed) {
+            this.executeDelete(id);
+          }
+        });
+      },
+
+      async executeDelete(id) {
+        try {
+          const response = await fetch(`/master/partner/${id}/delete`, {
+            method: "POST",
+          });
+          const data = await response.json();
+
+          if (data.status) {
+            Swal.fire({
+              icon: "success",
+              title: "Dinonaktifkan!",
+              text: data.message,
+              timer: 1500,
+              showConfirmButton: false,
+            }).then(() => {
+              window.location.reload();
+            });
+          } else {
+            Swal.fire(
+              "Error",
+              data.message || "Gagal menonaktifkan partner",
+              "error",
+            );
+          }
+        } catch (error) {
+          console.error("Delete error:", error);
+          Swal.fire("Error", "Gagal menghubungi server", "error");
+        }
+      },
+
+      confirmRestore(id) {
+        Swal.fire({
+          title: "Aktifkan Kembali?",
+          text: "Partner ini akan tersedia kembali untuk transaksi baru.",
+          icon: "question",
+          showCancelButton: true,
+          confirmButtonColor: "#10B981",
+          cancelButtonColor: "#6B7280",
+          confirmButtonText: "Ya, Aktifkan!",
+          cancelButtonText: "Batal",
+        }).then((result) => {
+          if (result.isConfirmed) {
+            this.executeRestore(id);
+          }
+        });
+      },
+
+      async executeRestore(id) {
+        try {
+          const response = await fetch(`/master/partner/${id}/restore`, {
+            method: "POST",
+          });
+          const data = await response.json();
+
+          if (data.status) {
+            Swal.fire({
+              icon: "success",
+              title: "Berhasil!",
+              text: data.message,
+              timer: 1500,
+              showConfirmButton: false,
+            }).then(() => {
+              window.location.reload();
+            });
+          } else {
+            Swal.fire(
+              "Error",
+              data.message || "Gagal mengembalikan data partner",
+              "error",
+            );
+          }
+        } catch (error) {
+          console.error("Restore error:", error);
+          Swal.fire("Error", "Gagal memproses permintaan", "error");
+        }
+      },
+    };
+  }
+</script>
+
+<!-- Add DataTables CSS & JS -->
+<link
+  rel="stylesheet"
+  type="text/css"
+  href="/static/vendor/jquery.dataTables.min.css"
+/>
+<script src="/static/vendor/jquery-3.7.1.min.js"></script>
+<script src="/static/vendor/jquery.dataTables.min.js"></script>
+
+<style>
+  /* Adjust datatables elements to match tailwind */
+  .dataTables_wrapper .dataTables_length select {
+    border-radius: 0.5rem;
+    border-color: #cbd5e1;
+    padding: 0.25rem 2rem 0.25rem 0.5rem;
+    outline: none;
+  }
+  .dataTables_wrapper .dataTables_filter {
+    display: none;
+  } /* Hide default search, use ours */
+  .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+    background: #005596 !important;
+    color: white !important;
+    border: none;
+    border-radius: 0.5rem;
+  }
+  .dataTables_wrapper .dataTables_paginate .paginate_button {
+    border-radius: 0.5rem;
+  }
+</style>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+      const isArchive = {{ .IsArchive }};
+      const ajaxUrl = isArchive ? "/master/partner/datatable?type=archive" : "/master/partner/datatable";
+
+      const table = $('#partnerTable').DataTable({
+          serverSide: true,
+          processing: true,
+          ajax: {
+              url: ajaxUrl,
+              type: "POST",
+              error: function(xhr, error, thrown) {
+                  console.error("DataTables Error: ", error);
+              }
+          },
+          language: {
+              search: "Cari:",
+              lengthMenu: "Tampilkan _MENU_ data",
+              info: "Menampilkan _START_ hingga _END_ dari _TOTAL_ data",
+              infoEmpty: "Tidak ada data",
+              infoFiltered: "(disaring dari _MAX_ total data)",
+              zeroRecords: "Tidak ada data yang sesuai",
+              emptyTable: "Tidak ada data tersedia",
+              paginate: { first: "Pertama", last: "Terakhir", next: "Berikutnya", previous: "Sebelumnya" },
+              processing: "Memproses..."
+          },
+          columns: [
+              { data: "name", className: "p-4 text-sm font-medium text-slate-800" },
+              {
+                  data: "contact_person",
+                  className: "p-4 text-sm text-slate-600",
+                  render: function(data) { return data ? data : '-'; }
+              },
+              {
+                  data: "phone",
+                  className: "p-4 text-sm text-slate-600",
+                  render: function(data) { return data ? data : '-'; }
+              },
+              {
+                  data: "id",
+                  orderable: false,
+                  searchable: false,
+                  className: "p-4 text-sm text-right",
+                  render: function(data, type, row) {
+                      // Escape strings for JS
+                      const name = row.name ? row.name.replace(/'/g, "\\'") : '';
+                      const cp = row.contact_person ? row.contact_person.replace(/'/g, "\\'") : '';
+                      const ph = row.phone ? row.phone.replace(/'/g, "\\'") : '';
+                      const addr = row.address ? row.address.replace(/'/g, "\\'") : '';
+
+                      let actionHtml = `<div class="flex justify-end gap-2">
+                          <button onclick="window.dispatchEvent(new CustomEvent('open-detail', {detail: {id: ${data}, name: '${name}', cp: '${cp}', ph: '${ph}', addr: '${addr}'}}))" class="p-1.5 text-[#005596] hover:bg-blue-50 rounded transition-colors tooltip" title="Detail">
+                              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                          </button>`;
+
+                      if (!isArchive) {
+                          actionHtml += `
+                          <button onclick="window.dispatchEvent(new CustomEvent('open-edit', {detail: {id: ${data}, name: '${name}', cp: '${cp}', ph: '${ph}', addr: '${addr}'}}))" class="p-1.5 text-amber-500 hover:bg-amber-50 rounded transition-colors tooltip" title="Edit">
+                              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                          </button>
+                          <button onclick="window.dispatchEvent(new CustomEvent('req-delete', {detail: {id: ${data}}}))" class="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors tooltip" title="Nonaktifkan">
+                              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                          </button>`;
+                      } else {
+                          actionHtml += `
+                          <button onclick="window.dispatchEvent(new CustomEvent('req-restore', {detail: {id: ${data}}}))" class="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors tooltip" title="Re-aktifkan">
+                              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                          </button>`;
+                      }
+
+                      actionHtml += `</div>`;
+                      return actionHtml;
+                  }
+              }
+          ]
+      });
+
+      // Connect custom search input to datatables search
+      $('#searchInput').on('keyup', function() {
+          table.search(this.value).draw();
+      });
+  });
+</script>
+
+{{ template "footer.html" . }} {{ end }}

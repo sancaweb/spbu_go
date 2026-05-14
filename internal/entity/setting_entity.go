@@ -8,7 +8,7 @@ import (
 
 type Setting struct {
 	ID           uint           `gorm:"primaryKey" json:"id"`
-	SettingName  string         `gorm:"column:setting_name;type:varchar(100);uniqueIndex;not null" json:"setting_name"`
+	SettingName  string         `gorm:"column:setting_name;type:varchar(100);unique;not null" json:"setting_name"`
 	SettingValue string         `gorm:"column:setting_value;type:varchar(255);not null;default:''" json:"setting_value"`
 	CreatedAt    time.Time      `json:"created_at"`
 	UpdatedAt    time.Time      `json:"updated_at"`

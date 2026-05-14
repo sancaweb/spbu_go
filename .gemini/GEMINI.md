@@ -28,6 +28,8 @@ Before writing code, ALWAYS check these context files to understand the SPBU sys
 
 3. **Database:**
    - Use Database Transactions (`BEGIN`, `COMMIT`, `ROLLBACK`) for any operation involving money or fuel stock decrement. This is CRITICAL for an SPBU app.
+   - **User Tracking (UpdatedBy/CreatedBy):** When saving a record that tracks which user inputted the data, ALWAYS retrieve the `User` object from the Gin context (which gets it from the session). Set the `UpdatedBy` pointer (`partner.UpdatedBy = &u.ID`). 
+   - **Crucial GORM Rule:** ALWAYS use `.Omit("Updater")` (or the respective relation name) when calling `db.Create()` or `db.Save()` to prevent GORM from attempting to insert a blank nested User object and causing Foreign Key violations.
 
 4. **Code Style:**
    - Follow standard `gofmt`.
@@ -56,6 +58,14 @@ Semua angka numerik di seluruh project HARUS menggunakan format Indonesia:
 - `formatInputStock(val)` — Live format input stok (dengan desimal koma)
 - `formatInputDecimal(val)` — Live format input desimal umum (e.g. persen)
 - `parseIDR(val)` — Parse string Indonesia ke raw number: `1.234,56` → `1234.56`
+
+## SERVER-SIDE DATATABLE RULE (WAJIB)
+Untuk semua fitur datatable yang berpotensi memiliki data besar, WAJIB menggunakan mekanisme Server-Side Processing:
+1. **Frontend:** Gunakan DataTables JS dengan flag `serverSide: true` dan konfigurasikan `ajax` ke endpoint backend. Render tombol aksi (Edit/Hapus) di dalam `columns.render`.
+2. **Backend (Gin):** Buat satu endpoint khusus (contoh: `/master/partner/datatable`) yang merespons metode GET/POST.
+3. **Parameter Handler:** Tangkap parameter dari DataTables: `draw`, `start`, `length`, `search[value]`, `order[0][column]`, dan `order[0][dir]`.
+4. **Repository:** Implementasikan pagination (`OFFSET` dan `LIMIT`), pencarian global (`WHERE ... ILIKE ...`), dan sorting dinamis (`ORDER BY ...`). Ingat selalu untuk return *total records* dan *filtered records*.
+5. **JSON Response:** Kembalikan JSON dengan struktur standard DataTables: `{ "draw": draw, "recordsTotal": total, "recordsFiltered": filtered, "data": [] }`.
 
 ## MODAL/POPUP SCROLL RULE (WAJIB)
 Semua modal/popup yang kontennya bisa melebihi tinggi layar HARUS punya scroll. Pada inner content div (bukan backdrop), tambahkan: `max-h-[90vh] overflow-y-auto`. Jangan tambahkan scroll pada list internal secara terpisah — biarkan seluruh form yang scroll.

@@ -1,0 +1,326 @@
+{{ define "master/keuangan/coa_mapping/index.html" }} {{ template "header.html"
+. }}
+
+<div x-data="coaMappingApp()" x-init="init()">
+  <!-- Page Header -->
+  <div class="flex justify-between items-center mb-6">
+    <div>
+      <h2 class="text-3xl font-bold text-slate-800">COA Mapping</h2>
+      <p class="text-slate-500">
+        Pemetaan akun jurnal untuk setiap jenis transaksi
+      </p>
+    </div>
+    <a
+      href="/master/keuangan/coa"
+      class="px-4 py-2 glass-card hover:bg-white/80 transition text-slate-600 font-semibold rounded-lg flex items-center gap-2 border border-slate-200"
+    >
+      ← Kembali ke COA
+    </a>
+  </div>
+
+  <!-- Info Banner -->
+  <div
+    class="glass-card rounded-2xl p-4 mb-6 border-l-4 border-[#005596] bg-blue-50/50"
+  >
+    <p class="text-sm text-[#005596] font-medium">
+      💡 Setiap baris mapping menentukan akun COA yang akan digunakan saat
+      sistem memproses jurnal otomatis. Untuk BBM baru, gunakan tombol
+      <strong>"Generate COA"</strong> di halaman Master BBM agar akun dan
+      mapping terbentuk otomatis.
+    </p>
+  </div>
+
+  <!-- Trans Type Tabs -->
+  <div class="flex flex-wrap gap-2 mb-6">
+    {{ range $idx, $tt := .TransTypes }}
+    <button
+      @click="activeTab = '{{ $tt.Code }}'"
+      :class="activeTab === '{{ $tt.Code }}' ? 'bg-[#005596] text-white shadow-lg' : 'glass-card text-slate-600 hover:bg-white/80'"
+      class="px-3 py-1.5 rounded-xl text-sm font-medium transition"
+    >
+      {{ $tt.Label }}
+    </button>
+    {{ end }}
+  </div>
+
+  <!-- Mapping Tables per TransType -->
+  {{ range $tt := .TransTypes }} {{/* Check if this trans type has any
+  BBM-specific roles */}} {{ $hasBBMRoles := false }} {{ range $role :=
+  $tt.Roles }}{{ if $role.IsBBM }}{{ $hasBBMRoles = true }}{{ end }}{{ end }}
+  <div
+    x-show="activeTab === '{{ $tt.Code }}'"
+    class="glass-card rounded-2xl overflow-hidden shadow-lg mb-6"
+  >
+    <div
+      class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center"
+    >
+      <h3 class="font-bold text-slate-800">{{ $tt.Label }}</h3>
+      <span class="text-xs text-slate-400 font-mono">{{ $tt.Code }}</span>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-left">
+        <thead
+          class="text-xs text-slate-500 uppercase font-bold border-b border-slate-100"
+        >
+          <tr>
+            <th class="p-4 w-8">D/K</th>
+            <th class="p-4">Peran dalam Jurnal</th>
+            {{ if $hasBBMRoles }}
+            <th class="p-4">Jenis BBM</th>
+            {{ end }}
+            <th class="p-4">Akun COA yang Digunakan</th>
+            <th class="p-4 text-right w-24">Aksi</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-50">
+          {{ range $role := $tt.Roles }} {{ if $role.IsBBM }} {{/* Render one
+          row per BBM from MappingMap */}} {{ $mappings := index $.MappingMap
+          $tt.Code }} {{/* We render existing mappings for this role first */}}
+          {{ range $m := $mappings }} {{ if eq $m.Role $role.Role }}
+          <tr class="hover:bg-slate-50/50 transition">
+            <td class="p-4">
+              {{ if eq $role.DC "D" }}
+              <span
+                class="px-2 py-0.5 bg-blue-50 text-blue-600 border border-blue-100 rounded text-xs font-bold"
+                >D</span
+              >
+              {{ else }}
+              <span
+                class="px-2 py-0.5 bg-green-50 text-green-600 border border-green-100 rounded text-xs font-bold"
+                >K</span
+              >
+              {{ end }}
+            </td>
+            <td class="p-4 text-sm text-slate-700">{{ $role.Label }}</td>
+            <td class="p-4 text-sm font-medium text-slate-800">
+              {{ if $m.BBM }}{{ $m.BBM.Name }}{{ else }}<span
+                class="text-slate-400 italic"
+                >—</span
+              >{{ end }}
+            </td>
+            <td class="p-4">
+              <span class="font-mono text-xs text-slate-500 mr-1"
+                >{{ if $m.COA }}{{ $m.COA.Code }}{{ end }}</span
+              >
+              <span class="text-sm text-slate-700"
+                >{{ if $m.COA }}{{ $m.COA.Name }}{{ else }}<span
+                  class="text-red-400 italic"
+                  >Belum diset</span
+                >{{ end }}</span
+              >
+            </td>
+            <td class="p-4 text-right">
+              <button
+                @click="openEdit({{ $m.ID }}, '{{ $tt.Code }}', '{{ $role.Role }}', '{{ $role.Label }}', {{ if $m.COAID }}{{ $m.COAID }}{{ else }}0{{ end }}, {{ if $m.BBMID }}{{ $m.BBMID }}{{ else }}0{{ end }})"
+                class="text-amber-500 hover:text-amber-700 p-1 rounded hover:bg-amber-50 transition text-sm"
+              >
+                ✏️
+              </button>
+            </td>
+          </tr>
+          {{ end }} {{ end }} {{ else }} {{/* Single row for non-BBM roles */}}
+          {{ $mappings := index $.MappingMap $tt.Code }} {{ $found := false }}
+          {{ range $m := $mappings }} {{ if and (eq $m.Role $role.Role) (not
+          $m.BBMID) }} {{ $found = true }}
+          <tr class="hover:bg-slate-50/50 transition">
+            <td class="p-4">
+              {{ if eq $role.DC "D" }}
+              <span
+                class="px-2 py-0.5 bg-blue-50 text-blue-600 border border-blue-100 rounded text-xs font-bold"
+                >D</span
+              >
+              {{ else }}
+              <span
+                class="px-2 py-0.5 bg-green-50 text-green-600 border border-green-100 rounded text-xs font-bold"
+                >K</span
+              >
+              {{ end }}
+            </td>
+            <td class="p-4 text-sm text-slate-700">{{ $role.Label }}</td>
+            {{ if $hasBBMRoles }}
+            <td class="p-4 text-sm text-slate-400 italic">—</td>
+            {{ end }}
+            <td class="p-4">
+              <span class="font-mono text-xs text-slate-500 mr-1"
+                >{{ if $m.COA }}{{ $m.COA.Code }}{{ end }}</span
+              >
+              <span class="text-sm text-slate-700"
+                >{{ if $m.COA }}{{ $m.COA.Name }}{{ else }}<span
+                  class="text-red-400 italic"
+                  >Belum diset</span
+                >{{ end }}</span
+              >
+            </td>
+            <td class="p-4 text-right">
+              <button
+                @click="openEdit({{ $m.ID }}, '{{ $tt.Code }}', '{{ $role.Role }}', '{{ $role.Label }}', {{ if $m.COAID }}{{ $m.COAID }}{{ else }}0{{ end }}, 0)"
+                class="text-amber-500 hover:text-amber-700 p-1 rounded hover:bg-amber-50 transition text-sm"
+              >
+                ✏️
+              </button>
+            </td>
+          </tr>
+          {{ end }} {{ end }} {{ if not $found }}
+          <tr class="hover:bg-slate-50/50 transition">
+            <td class="p-4">
+              {{ if eq $role.DC "D" }}
+              <span
+                class="px-2 py-0.5 bg-blue-50 text-blue-600 border border-blue-100 rounded text-xs font-bold"
+                >D</span
+              >
+              {{ else }}
+              <span
+                class="px-2 py-0.5 bg-green-50 text-green-600 border border-green-100 rounded text-xs font-bold"
+                >K</span
+              >
+              {{ end }}
+            </td>
+            <td class="p-4 text-sm text-slate-700">{{ $role.Label }}</td>
+            {{ if $hasBBMRoles }}
+            <td class="p-4 text-sm text-slate-400 italic">—</td>
+            {{ end }}
+            <td class="p-4 text-sm text-red-400 italic">
+              Belum diset — klik ✏️ untuk menetapkan akun
+            </td>
+            <td class="p-4 text-right">
+              <button
+                @click="openEdit(0, '{{ $tt.Code }}', '{{ $role.Role }}', '{{ $role.Label }}', 0, 0)"
+                class="text-amber-500 hover:text-amber-700 p-1 rounded hover:bg-amber-50 transition text-sm"
+              >
+                ✏️
+              </button>
+            </td>
+          </tr>
+          {{ end }} {{ end }} {{ end }}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {{ end }}
+
+  <!-- Edit Mapping Modal -->
+  <div
+    x-show="modalOpen"
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm"
+    style="display: none"
+  >
+    <div class="glass-card bg-white p-8 rounded-2xl w-full max-w-lg shadow-2xl">
+      <h3 class="text-xl font-bold mb-1 text-slate-800">Set Akun COA</h3>
+      <p class="text-sm text-slate-500 mb-5" x-text="form.label"></p>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium mb-1 text-slate-600"
+            >Akun COA <span class="text-red-400">*</span></label
+          >
+          <select
+            x-model="form.coa_id"
+            class="w-full p-2.5 rounded-lg border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none text-sm"
+            required
+          >
+            <option value="0">-- Pilih Akun --</option>
+            {{ range .DetailCOAs }}
+            <option value="{{ .ID }}">{{ .Code }} — {{ .Name }}</option>
+            {{ end }}
+          </select>
+        </div>
+      </div>
+
+      <div class="flex gap-3 mt-6">
+        <button
+          @click="modalOpen = false"
+          class="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition font-medium"
+        >
+          Batal
+        </button>
+        <button
+          @click="submitMapping()"
+          :disabled="isSubmitting"
+          class="flex-1 px-4 py-2.5 rounded-xl bg-[#005596] text-white font-semibold hover:bg-blue-700 transition disabled:opacity-60 flex items-center justify-center gap-2"
+        >
+          <span
+            x-show="isSubmitting"
+            class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"
+          ></span>
+          <span x-text="isSubmitting ? 'Menyimpan...' : 'Simpan'"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function coaMappingApp() {
+    return {
+      activeTab:
+        "{{ if .TransTypes }}{{ (index .TransTypes 0).Code }}{{ end }}",
+      modalOpen: false,
+      isSubmitting: false,
+      form: {
+        id: 0,
+        trans_type: "",
+        role: "",
+        label: "",
+        coa_id: "0",
+        bbm_id: "0",
+      },
+
+      init() {},
+
+      openEdit(id, transType, role, label, coaId, bbmId) {
+        this.form = {
+          id: id,
+          trans_type: transType,
+          role: role,
+          label: label,
+          coa_id: String(coaId || 0),
+          bbm_id: String(bbmId || 0),
+        };
+        this.modalOpen = true;
+      },
+
+      async submitMapping() {
+        if (!this.form.coa_id || this.form.coa_id === "0") {
+          Swal.fire({
+            icon: "warning",
+            title: "Akun harus dipilih",
+            timer: 2000,
+            showConfirmButton: false,
+          });
+          return;
+        }
+        this.isSubmitting = true;
+        try {
+          const fd = new FormData();
+          fd.append("trans_type", this.form.trans_type);
+          fd.append("role", this.form.role);
+          fd.append("label", this.form.label);
+          fd.append("coa_id", this.form.coa_id);
+          fd.append("bbm_id", this.form.bbm_id);
+
+          const res = await fetch("/master/keuangan/coa-mapping/upsert", {
+            method: "POST",
+            body: fd,
+          });
+          const data = await res.json();
+          if (data.status) {
+            this.modalOpen = false;
+            Swal.fire({
+              icon: "success",
+              title: "Disimpan",
+              timer: 1500,
+              showConfirmButton: false,
+            }).then(() => location.reload());
+          } else {
+            Swal.fire({ icon: "error", title: "Gagal", text: data.message });
+          }
+        } finally {
+          this.isSubmitting = false;
+        }
+      },
+    };
+  }
+</script>
+
+{{ template "footer.html" . }} {{ end }}

@@ -1,0 +1,751 @@
+{{ define "master/potongan/index.html" }} {{ template "header.html" . }}
+
+<div class="space-y-6" x-data="potonganManager()">
+  <!-- Header -->
+  <div
+    class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
+  >
+    <div>
+      <h2 class="text-2xl font-bold text-slate-800">{{ .Title }}</h2>
+      <p class="text-slate-500 text-sm mt-1">
+        {{ if .IsArchive }}Data potongan yang tidak aktif{{ else }}Kelola daftar
+        komponen potongan yang dibebankan kepada karyawan{{ end }}
+      </p>
+    </div>
+    <div class="flex items-center gap-3">
+      {{ if .IsArchive }}
+      <a
+        href="/master/potongan"
+        class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold transition-all flex items-center gap-2"
+      >
+        <svg
+          class="w-4 h-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M15 19l-7-7 7-7"
+          ></path>
+        </svg>
+        Kembali
+      </a>
+      {{ else }}
+      <a
+        href="/master/potongan/archive"
+        class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg font-semibold transition-all flex items-center gap-2"
+      >
+        <svg
+          class="w-4 h-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1 12a2 2 0 002 2h8a2 2 0 002-2L19 8"
+          ></path>
+        </svg>
+        Tidak Aktif
+      </a>
+      <button
+        @click="openCreateModal()"
+        class="px-4 py-2 bg-[#005596] hover:bg-blue-800 text-white rounded-lg font-bold shadow-lg shadow-blue-500/30 transition-all flex items-center gap-2"
+      >
+        <svg
+          class="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M12 4v16m8-8H4"
+          ></path>
+        </svg>
+        Tambah Potongan
+      </button>
+      {{ end }}
+    </div>
+  </div>
+
+  <!-- Table Card -->
+  <div
+    class="glass-card bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"
+  >
+    <div class="p-6">
+      <!-- Search -->
+      <div class="mb-4 flex justify-end">
+        <div class="relative">
+          <svg
+            class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"
+            ></path>
+          </svg>
+          <input
+            type="text"
+            id="searchPotongan"
+            placeholder="Cari potongan..."
+            class="pl-9 pr-4 py-2 rounded-lg border border-slate-300 text-sm focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none w-64"
+          />
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse" id="potonganTable">
+          <thead>
+            <tr class="bg-slate-50 border-b border-slate-200">
+              <th class="p-4 font-semibold text-slate-600 text-sm w-12">#</th>
+              <th class="p-4 font-semibold text-slate-600 text-sm">Kode</th>
+              <th class="p-4 font-semibold text-slate-600 text-sm">
+                Nama Potongan
+              </th>
+              <th class="p-4 font-semibold text-slate-600 text-sm">Tipe</th>
+              <th class="p-4 font-semibold text-slate-600 text-sm">Nilai</th>
+              <th class="p-4 font-semibold text-slate-600 text-sm">
+                Deskripsi
+              </th>
+              <th class="p-4 font-semibold text-slate-600 text-sm">Status</th>
+              <th class="p-4 font-semibold text-slate-600 text-sm text-center">
+                Aksi
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {{ range $i, $p := .Potongans }}
+            <tr
+              class="border-b border-slate-100 hover:bg-slate-50 transition-colors"
+            >
+              <td class="p-4 text-slate-500 text-sm">{{ $p.ID }}</td>
+              <td class="p-4">
+                <span
+                  class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-bold bg-slate-100 text-slate-700 font-mono tracking-wide"
+                >
+                  {{ $p.KodePotongan }}
+                </span>
+              </td>
+              <td class="p-4 font-semibold text-slate-800">
+                {{ $p.NamaPotongan }}
+              </td>
+              <td class="p-4">
+                {{ if eq $p.Tipe "persen" }}
+                <span
+                  class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700"
+                  >Persentase</span
+                >
+                {{ else }}
+                <span
+                  class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700"
+                  >Nominal</span
+                >
+                {{ end }}
+              </td>
+              <td class="p-4 text-slate-700">
+                {{ if eq $p.Tipe "persen" }}
+                <span class="font-semibold text-orange-600"
+                  >{{ $p.Nilai }}%</span
+                >
+                {{ else }}
+                <span class="font-semibold text-red-600"
+                  >Rp {{ formatIDR $p.Nilai }}</span
+                >
+                {{ end }}
+              </td>
+              <td class="p-4 text-slate-500 text-sm max-w-xs truncate">
+                {{ if $p.Deskripsi }}{{ $p.Deskripsi }}{{ else }}<span
+                  class="text-slate-300"
+                  >—</span
+                >{{ end }}
+              </td>
+              <td class="p-4">
+                {{ if $p.IsActive }}
+                <span
+                  class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700"
+                  >Aktif</span
+                >
+                {{ else }}
+                <span
+                  class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-600"
+                  >Tidak Aktif</span
+                >
+                {{ end }}
+              </td>
+              <td class="p-4">
+                <div class="flex items-center justify-center gap-2">
+                  <button
+                    @click="openEditModal({{ $p.ID }}, '{{ js $p.KodePotongan }}', '{{ js $p.NamaPotongan }}', '{{ $p.Tipe }}', {{ $p.Nilai }}, '{{ js $p.Deskripsi }}', {{ $p.IsActive }})"
+                    class="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
+                  >
+                    <svg
+                      class="w-3.5 h-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.172-8.172z"
+                      ></path>
+                    </svg>
+                    Edit
+                  </button>
+                  <button
+                    @click="confirmDelete({{ $p.ID }}, '{{ js $p.NamaPotongan }}')"
+                    class="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
+                  >
+                    <svg
+                      class="w-3.5 h-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                      ></path>
+                    </svg>
+                    Hapus
+                  </button>
+                </div>
+              </td>
+            </tr>
+            {{ else }}
+            <tr>
+              <td colspan="8" class="p-8 text-center text-slate-400 text-sm">
+                {{ if .IsArchive }}Tidak ada potongan yang tidak aktif{{ else
+                }}Belum ada data potongan{{ end }}
+              </td>
+            </tr>
+            {{ end }}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Create / Edit -->
+  <div
+    x-show="isOpen"
+    x-cloak
+    class="fixed inset-0 z-50 flex items-center justify-center p-4"
+    @keydown.escape.window="closeModal()"
+  >
+    <div
+      class="absolute inset-0 bg-black/40 backdrop-blur-sm"
+      @click="closeModal()"
+    ></div>
+
+    <div
+      class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+    >
+      <!-- Modal Header -->
+      <div
+        class="flex items-center justify-between p-6 border-b border-slate-100"
+      >
+        <h3
+          class="text-lg font-bold text-slate-800"
+          x-text="isEdit ? 'Edit Potongan' : 'Tambah Potongan'"
+        ></h3>
+        <button
+          @click="closeModal()"
+          class="text-slate-400 hover:text-slate-600 transition-colors"
+        >
+          <svg
+            class="w-6 h-6"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M6 18L18 6M6 6l12 12"
+            ></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6 space-y-4">
+        <!-- Kode Potongan -->
+        <div>
+          <label class="block text-sm font-medium mb-1 text-slate-600">
+            Kode Potongan <span class="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            x-model="form.kode_potongan"
+            @input="form.kode_potongan = form.kode_potongan.toUpperCase()"
+            placeholder="Contoh: BPJS, PPH21, POT1"
+            maxlength="10"
+            class="w-full p-2.5 rounded-lg border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none font-mono tracking-wide uppercase"
+          />
+          <p class="text-xs text-slate-400 mt-1">
+            Maks. 10 karakter, otomatis huruf kapital
+          </p>
+        </div>
+
+        <!-- Nama Potongan -->
+        <div>
+          <label class="block text-sm font-medium mb-1 text-slate-600">
+            Nama Potongan <span class="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            x-model="form.nama_potongan"
+            @input="form.nama_potongan = toTitleCase(form.nama_potongan)"
+            placeholder="Contoh: Potongan BPJS, PPh 21, Kasbon"
+            class="w-full p-2.5 rounded-lg border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none"
+          />
+        </div>
+
+        <!-- Tipe -->
+        <div>
+          <label class="block text-sm font-medium mb-1 text-slate-600">
+            Tipe Potongan <span class="text-red-500">*</span>
+          </label>
+          <div class="flex gap-3">
+            <label
+              class="flex-1 flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors"
+              :class="form.tipe === 'nominal' ? 'border-[#005596] bg-blue-50' : 'border-slate-300 hover:bg-slate-50'"
+            >
+              <input
+                type="radio"
+                x-model="form.tipe"
+                value="nominal"
+                @change="onTipeChange()"
+                class="text-[#005596]"
+              />
+              <div>
+                <p class="text-sm font-semibold text-slate-700">Nominal (Rp)</p>
+                <p class="text-xs text-slate-400">Jumlah tetap dalam Rupiah</p>
+              </div>
+            </label>
+            <label
+              class="flex-1 flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors"
+              :class="form.tipe === 'persen' ? 'border-orange-500 bg-orange-50' : 'border-slate-300 hover:bg-slate-50'"
+            >
+              <input
+                type="radio"
+                x-model="form.tipe"
+                value="persen"
+                @change="onTipeChange()"
+                class="text-orange-500"
+              />
+              <div>
+                <p class="text-sm font-semibold text-slate-700">
+                  Persentase (%)
+                </p>
+                <p class="text-xs text-slate-400">% dari gaji pokok</p>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Nilai -->
+        <div>
+          <label class="block text-sm font-medium mb-1 text-slate-600">
+            Nilai <span class="text-red-500">*</span>
+          </label>
+          <div class="relative">
+            <span
+              x-show="form.tipe === 'nominal'"
+              class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium"
+              >Rp</span
+            >
+            <input
+              type="text"
+              x-model="form.nilai_display"
+              @input="onNilaiInput($event)"
+              :placeholder="form.tipe === 'nominal' ? '0' : '0'"
+              :class="form.tipe === 'nominal' ? 'pl-9 pr-4' : 'pl-4 pr-9'"
+              class="w-full p-2.5 rounded-lg border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none"
+            />
+            <span
+              x-show="form.tipe === 'persen'"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium"
+              >%</span
+            >
+          </div>
+          <p
+            class="text-xs text-slate-400 mt-1"
+            x-show="form.tipe === 'nominal'"
+          >
+            Masukkan nilai dalam Rupiah (contoh: 50.000)
+          </p>
+          <p
+            class="text-xs text-slate-400 mt-1"
+            x-show="form.tipe === 'persen'"
+          >
+            Masukkan persentase dari gaji pokok (contoh: 5)
+          </p>
+        </div>
+
+        <!-- Deskripsi -->
+        <div>
+          <label class="block text-sm font-medium mb-1 text-slate-600">
+            Deskripsi <span class="text-xs text-slate-400">(Opsional)</span>
+          </label>
+          <textarea
+            x-model="form.deskripsi"
+            rows="2"
+            placeholder="Keterangan tambahan tentang potongan ini..."
+            class="w-full p-2.5 rounded-lg border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none resize-none"
+          ></textarea>
+        </div>
+
+        <!-- Status Aktif -->
+        <div>
+          <label class="block text-sm font-medium mb-2 text-slate-600"
+            >Status</label
+          >
+          <label
+            class="flex items-center gap-3 cursor-pointer select-none w-fit"
+          >
+            <div class="relative">
+              <input type="checkbox" x-model="form.is_active" class="sr-only" />
+              <div
+                :class="form.is_active ? 'bg-green-500' : 'bg-slate-300'"
+                class="w-11 h-6 rounded-full transition-colors duration-200"
+              ></div>
+              <div
+                :class="form.is_active ? 'translate-x-5' : 'translate-x-0'"
+                class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
+              ></div>
+            </div>
+            <span
+              x-text="form.is_active ? 'Aktif' : 'Tidak Aktif'"
+              :class="form.is_active ? 'text-green-600 font-semibold' : 'text-red-500 font-semibold'"
+              class="text-sm"
+            ></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="flex justify-end gap-3 p-6 pt-0">
+        <button
+          type="button"
+          @click="closeModal()"
+          class="px-4 py-2 rounded-lg font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+        >
+          Batal
+        </button>
+        <button
+          type="button"
+          @click="submitForm()"
+          :disabled="isSubmitting"
+          class="px-5 py-2 bg-[#005596] hover:bg-blue-800 disabled:opacity-60 text-white rounded-lg font-semibold transition-all flex items-center gap-2"
+        >
+          <svg
+            x-show="isSubmitting"
+            class="animate-spin w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              class="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              stroke-width="4"
+            ></circle>
+            <path
+              class="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8v8H4z"
+            ></path>
+          </svg>
+          <span
+            x-text="isSubmitting ? 'Menyimpan...' : (isEdit ? 'Update' : 'Simpan')"
+          ></span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/vendor/sweetalert2.all.min.js"></script>
+<script>
+  function potonganManager() {
+    return {
+      isOpen: false,
+      isEdit: false,
+      isSubmitting: false,
+      form: {
+        id: null,
+        kode_potongan: "",
+        nama_potongan: "",
+        tipe: "nominal",
+        nilai: "0",
+        nilai_display: "",
+        deskripsi: "",
+        is_active: true,
+      },
+
+      toTitleCase(str) {
+        return str.replace(
+          /\w\S*/g,
+          (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(),
+        );
+      },
+
+      resetForm() {
+        this.form = {
+          id: null,
+          kode_potongan: "",
+          nama_potongan: "",
+          tipe: "nominal",
+          nilai: "0",
+          nilai_display: "",
+          deskripsi: "",
+          is_active: true,
+        };
+      },
+
+      openCreateModal() {
+        this.resetForm();
+        this.isEdit = false;
+        this.isOpen = true;
+      },
+
+      openEditModal(id, kode, nama, tipe, nilai, deskripsi, isActive) {
+        this.resetForm();
+        this.isEdit = true;
+        this.isOpen = true;
+        this.form.id = id;
+        this.form.kode_potongan = kode;
+        this.form.nama_potongan = nama;
+        this.form.tipe = tipe;
+        this.form.nilai = String(nilai);
+        this.form.nilai_display =
+          tipe === "nominal"
+            ? Number(nilai).toLocaleString("id-ID")
+            : String(nilai);
+        this.form.deskripsi = deskripsi;
+        this.form.is_active = isActive;
+      },
+
+      closeModal() {
+        this.isOpen = false;
+        this.resetForm();
+      },
+
+      onTipeChange() {
+        // Reset nilai when tipe changes
+        this.form.nilai = "0";
+        this.form.nilai_display = "";
+      },
+
+      onNilaiInput(e) {
+        let val = e.target.value;
+        if (this.form.tipe === "nominal") {
+          const digits = val.replace(/\D/g, "");
+          const num = parseInt(digits, 10);
+          const formatted = isNaN(num) ? "" : num.toLocaleString("id-ID");
+          e.target.value = formatted;
+          this.form.nilai_display = formatted;
+          this.form.nilai = digits || "0";
+        } else {
+          val = val.replace(/\D/g, "");
+          e.target.value = val;
+          this.form.nilai_display = val;
+          this.form.nilai = val || "0";
+        }
+      },
+
+      async submitForm() {
+        if (!this.form.kode_potongan.trim()) {
+          Swal.fire({
+            icon: "warning",
+            title: "Perhatian",
+            text: "Kode Potongan wajib diisi",
+            confirmButtonColor: "#005596",
+          });
+          return;
+        }
+        if (!this.form.nama_potongan.trim()) {
+          Swal.fire({
+            icon: "warning",
+            title: "Perhatian",
+            text: "Nama Potongan wajib diisi",
+            confirmButtonColor: "#005596",
+          });
+          return;
+        }
+
+        this.isSubmitting = true;
+        const url = this.isEdit
+          ? `/master/potongan/${this.form.id}`
+          : "/master/potongan";
+
+        const formData = new FormData();
+        formData.append("kode_potongan", this.form.kode_potongan);
+        formData.append("nama_potongan", this.form.nama_potongan);
+        formData.append("tipe", this.form.tipe);
+        formData.append("nilai", this.form.nilai);
+        formData.append("deskripsi", this.form.deskripsi);
+        formData.append("is_active", this.form.is_active ? "true" : "false");
+
+        try {
+          const res = await fetch(url, { method: "POST", body: formData });
+          const json = await res.json();
+          if (json.status) {
+            this.closeModal();
+            await Swal.fire({
+              icon: "success",
+              title: "Berhasil",
+              text: json.message,
+              confirmButtonColor: "#005596",
+              timer: 1500,
+              showConfirmButton: false,
+            });
+            window.location.reload();
+          } else {
+            Swal.fire({
+              icon: "error",
+              title: "Gagal",
+              text: json.message,
+              confirmButtonColor: "#005596",
+            });
+          }
+        } catch (e) {
+          Swal.fire({
+            icon: "error",
+            title: "Error",
+            text: "Terjadi kesalahan pada server",
+            confirmButtonColor: "#005596",
+          });
+        } finally {
+          this.isSubmitting = false;
+        }
+      },
+
+      async confirmDelete(id, nama) {
+        const result = await Swal.fire({
+          icon: "warning",
+          title: "Hapus Potongan?",
+          html: `Data <strong>"${nama}"</strong> akan dihapus.`,
+          showCancelButton: true,
+          confirmButtonColor: "#dc2626",
+          cancelButtonColor: "#64748b",
+          confirmButtonText: "Ya, Hapus",
+          cancelButtonText: "Batal",
+        });
+        if (!result.isConfirmed) return;
+
+        try {
+          const res = await fetch(`/master/potongan/${id}/delete`, {
+            method: "POST",
+          });
+          const json = await res.json();
+          if (json.status) {
+            await Swal.fire({
+              icon: "success",
+              title: "Dihapus",
+              text: json.message,
+              confirmButtonColor: "#005596",
+              timer: 1500,
+              showConfirmButton: false,
+            });
+            window.location.reload();
+          } else {
+            Swal.fire({
+              icon: "error",
+              title: "Gagal",
+              text: json.message,
+              confirmButtonColor: "#005596",
+            });
+          }
+        } catch (e) {
+          Swal.fire({
+            icon: "error",
+            title: "Error",
+            text: "Terjadi kesalahan pada server",
+            confirmButtonColor: "#005596",
+          });
+        }
+      },
+    };
+  }
+</script>
+
+<!-- DataTables -->
+<link rel="stylesheet" href="/static/vendor/jquery.dataTables.min.css" />
+<script src="/static/vendor/jquery-3.7.1.min.js"></script>
+<script src="/static/vendor/jquery.dataTables.min.js"></script>
+<style>
+  .dataTables_wrapper .dataTables_filter {
+    display: none;
+  }
+  .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+    background: #005596 !important;
+    color: white !important;
+    border: none;
+    border-radius: 0.5rem;
+  }
+  .dataTables_wrapper .dataTables_paginate .paginate_button {
+    border-radius: 0.5rem;
+  }
+  .dataTables_wrapper .dataTables_info {
+    font-size: 0.8rem;
+    color: #64748b;
+  }
+  .dataTables_wrapper .dataTables_length select {
+    border-radius: 0.5rem;
+    border: 1px solid #cbd5e1;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.85rem;
+  }
+</style>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const table = $("#potonganTable").DataTable({
+      language: {
+        search: "Cari:",
+        lengthMenu: "Tampilkan _MENU_ data",
+        info: "Menampilkan _START_ hingga _END_ dari _TOTAL_ data",
+        infoEmpty: "Tidak ada data",
+        infoFiltered: "(disaring dari _MAX_ total data)",
+        zeroRecords: "Tidak ada data yang sesuai",
+        emptyTable: "Tidak ada data tersedia",
+        paginate: {
+          first: "Pertama",
+          last: "Terakhir",
+          next: "Berikutnya",
+          previous: "Sebelumnya",
+        },
+        processing: "Memproses...",
+      },
+      order: [[0, "asc"]],
+      columnDefs: [{ orderable: false, targets: -1 }],
+    });
+    document
+      .getElementById("searchPotongan")
+      .addEventListener("keyup", function () {
+        table.search(this.value).draw();
+      });
+  });
+</script>
+
+{{ template "footer.html" . }} {{ end }}

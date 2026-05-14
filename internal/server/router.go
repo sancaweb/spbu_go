@@ -1,6 +1,8 @@
 package server
 
 import (
+	"fmt"
+	"html/template"
 	"path/filepath"
 
 	"github.com/gin-gonic/gin"
@@ -9,15 +11,36 @@ import (
 func NewRouter() *gin.Engine {
 	r := gin.Default()
 
-	// Static files
+	// Register custom template functions
+	r.SetFuncMap(template.FuncMap{
+		"formatIDR": func(n int64) string {
+			// Format integer as Indonesian number: 1.500.000
+			if n == 0 {
+				return "0"
+			}
+			neg := ""
+			if n < 0 {
+				neg = "-"
+				n = -n
+			}
+			s := fmt.Sprintf("%d", n)
+			result := ""
+			for i, c := range s {
+				if i > 0 && (len(s)-i)%3 == 0 {
+					result += "."
+				}
+				result += string(c)
+			}
+			return neg + result
+		},
+	})
+
 	// Static files
 	r.Static("/static", "./static")
+	r.StaticFile("/favicon.ico", "./static/favicon.ico")
 
 	// Custom template loading to avoid Windows path issues
 	loadTemplates(r)
-
-	// Helper to make data available to all templates (e.g. current user)
-	// r.Use(middleware.TemplateData())
 
 	return r
 }
@@ -29,9 +52,10 @@ func loadTemplates(r *gin.Engine) {
 
 	// Explicitly list patterns using filepath.Join for OS-correct separators
 	patterns := []string{
-		"templates/*.html",     // Root templates (error.html)
-		"templates/*/*.html",   // Subdir (includes/header.html, main/home.html)
-		"templates/*/*/*.html", // Nested (master/bbm/index.html)
+		"templates/*.html",       // Root templates (error.html)
+		"templates/*/*.html",     // Subdir (includes/header.html, main/home.html)
+		"templates/*/*/*.html",   // Nested (master/bbm/index.html)
+		"templates/*/*/*/*.html", // Deep nested (master/keuangan/coa/index.html)
 	}
 
 	for _, pattern := range patterns {

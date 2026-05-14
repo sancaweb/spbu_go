@@ -5,6 +5,73 @@
 </div> <!-- End Min-h-screen -->
 {{ end }}
 
+<!-- Global Format Helpers -->
+<script>
+    // Format integer to IDR string with thousands separators
+    function formatIDR(value) {
+        if (!value) return "0";
+        return Number(value).toLocaleString('id-ID');
+    }
+
+    // Format integer stock to decimal formatted string based on decimal places config
+    function formatStock(rawValue, decimalPlaces = 0) {
+        if (!rawValue) return "0";
+        if (decimalPlaces === 0) return Number(rawValue).toLocaleString('id-ID');
+        const divisor = Math.pow(10, decimalPlaces);
+        return (rawValue / divisor).toLocaleString('id-ID', {
+            minimumFractionDigits: decimalPlaces,
+            maximumFractionDigits: decimalPlaces
+        });
+    }
+
+    // Parse IDR formatted string ('1.234.567' or '1.234,56') to raw float
+    function parseIDR(val) {
+        if (!val) return 0;
+        if (typeof val === 'number') return val;
+        // Remove thousands separator (.), replace decimal separator (,) with (.)
+        const rawString = String(val).replace(/\./g, '').replace(/,/g, '.');
+        const num = parseFloat(rawString);
+        return isNaN(num) ? 0 : num;
+    }
+
+    // Live auto-format input for integers (ribuan) without decimals
+    function formatInputIDR(element) {
+        let val = element.value.replace(/[^0-9]/g, ''); // keep only numbers
+        if (val) {
+            val = parseInt(val, 10).toLocaleString('id-ID');
+        }
+        element.value = val;
+    }
+
+    // Live auto-format input for decimals (stok, persentase) allowing comma
+    function formatInputDecimal(element) {
+        let val = element.value.replace(/[^0-9,]/g, ''); // keep numbers and commas
+        // allow only one comma
+        const parts = val.split(',');
+        if (parts.length > 2) {
+            val = parts[0] + ',' + parts.slice(1).join('');
+        }
+        
+        // format integer part with thousands separators
+        if (val.length > 0) {
+            let intPart = parts[0].replace(/\./g, '');
+            if (intPart !== '') {
+                intPart = parseInt(intPart, 10).toLocaleString('id-ID');
+            }
+            if (parts.length > 1) {
+                element.value = intPart + ',' + parts[1];
+            } else {
+                element.value = intPart;
+            }
+        } else {
+            element.value = '';
+        }
+    }
+    
+    // Alias for formatInputDecimal if some files specifically bindings to it
+    const formatInputStock = formatInputDecimal;
+</script>
+
 </body>
 </html>
 {{ end }}

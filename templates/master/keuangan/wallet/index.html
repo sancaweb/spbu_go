@@ -1,0 +1,587 @@
+{{ define "master/keuangan/wallet/index.html" }} {{ template "header.html" . }}
+
+<div class="space-y-6" x-data="walletManager()">
+  <!-- Header -->
+  <div
+    class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
+  >
+    <div>
+      <h2 class="text-2xl font-bold text-slate-800">{{ .Title }}</h2>
+      <p class="text-slate-500 text-sm mt-1">
+        Kelola dompet keuangan SPBU (Kas, Bank, dll)
+      </p>
+    </div>
+    <button
+      @click="openCreateModal()"
+      class="px-4 py-2 bg-[#005596] hover:bg-blue-800 text-white rounded-lg font-bold shadow-lg shadow-blue-500/30 transition-all flex items-center gap-2"
+    >
+      <svg
+        class="w-5 h-5"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M12 4v16m8-8H4"
+        ></path>
+      </svg>
+      Tambah Wallet
+    </button>
+  </div>
+
+  <!-- Table Card -->
+  <div
+    class="glass-card bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"
+  >
+    <div class="p-6">
+      <!-- Search -->
+      <div class="mb-4 flex justify-end">
+        <div class="relative">
+          <svg
+            class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"
+            ></path>
+          </svg>
+          <input
+            type="text"
+            id="searchWallet"
+            placeholder="Cari wallet..."
+            class="pl-9 pr-4 py-2 rounded-lg border border-slate-300 text-sm focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none w-64"
+          />
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse" id="walletTable">
+          <thead>
+            <tr class="bg-slate-50 border-b border-slate-200">
+              <th class="p-4 font-semibold text-slate-600 text-sm w-12">#</th>
+              <th class="p-4 font-semibold text-slate-600 text-sm">
+                Nama Wallet
+              </th>
+              <th class="p-4 font-semibold text-slate-600 text-sm">
+                Deskripsi
+              </th>
+              <th class="p-4 font-semibold text-slate-600 text-sm">Saldo</th>
+              <th class="p-4 font-semibold text-slate-600 text-sm">Default</th>
+              <th class="p-4 font-semibold text-slate-600 text-sm text-center">
+                Aksi
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {{ range $i, $w := .Wallets }}
+            <tr
+              class="border-b border-slate-100 hover:bg-slate-50 transition-colors"
+            >
+              <td class="p-4 text-slate-500 text-sm">{{ $w.ID }}</td>
+              <td class="p-4">
+                <div class="flex items-center gap-2">
+                  <div
+                    class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0"
+                  >
+                    <svg
+                      class="w-4 h-4 text-[#005596]"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+                      ></path>
+                    </svg>
+                  </div>
+                  <span class="font-semibold text-slate-800"
+                    >{{ $w.WalletName }}</span
+                  >
+                </div>
+              </td>
+              <td class="p-4 text-slate-500 text-sm max-w-xs truncate">
+                {{ if $w.Description }}{{ $w.Description }}{{ else }}<span
+                  class="text-slate-300"
+                  >—</span
+                >{{ end }}
+              </td>
+              <td class="p-4">
+                <span class="font-semibold text-slate-800 font-mono"
+                  >Rp {{ formatIDR $w.Saldo }}</span
+                >
+              </td>
+              <td class="p-4">
+                {{ if $w.IsDefault }}
+                <span
+                  class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700"
+                >
+                  <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path
+                      d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
+                    ></path>
+                  </svg>
+                  Default
+                </span>
+                {{ else }}
+                <span class="text-slate-300 text-xs">—</span>
+                {{ end }}
+              </td>
+              <td class="p-4">
+                <div class="flex items-center justify-center gap-2">
+                  <button
+                    @click="openEditModal({{ $w.ID }}, '{{ js $w.WalletName }}', {{ $w.IsDefault }}, '{{ js $w.Description }}', {{ $w.Saldo }})"
+                    class="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
+                  >
+                    <svg
+                      class="w-3.5 h-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.172-8.172z"
+                      ></path>
+                    </svg>
+                    Edit
+                  </button>
+                  <button
+                    @click="confirmDelete({{ $w.ID }}, '{{ js $w.WalletName }}')"
+                    class="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
+                  >
+                    <svg
+                      class="w-3.5 h-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                      ></path>
+                    </svg>
+                    Hapus
+                  </button>
+                </div>
+              </td>
+            </tr>
+            {{ else }}
+            <tr>
+              <td colspan="6" class="p-8 text-center text-slate-400 text-sm">
+                Belum ada data wallet
+              </td>
+            </tr>
+            {{ end }}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- CREATE / EDIT MODAL -->
+  <div
+    x-show="isOpen"
+    x-cloak
+    class="fixed inset-0 z-50 flex items-center justify-center p-4"
+    @keydown.escape.window="closeModal()"
+  >
+    <div
+      class="absolute inset-0 bg-black/40 backdrop-blur-sm"
+      @click="closeModal()"
+    ></div>
+    <div
+      class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+    >
+      <!-- Modal Header -->
+      <div
+        class="flex items-center justify-between p-6 border-b border-slate-100"
+      >
+        <h3
+          class="text-lg font-bold text-slate-800"
+          x-text="isEdit ? 'Edit Wallet' : 'Tambah Wallet'"
+        ></h3>
+        <button
+          @click="closeModal()"
+          class="text-slate-400 hover:text-slate-600 transition-colors"
+        >
+          <svg
+            class="w-6 h-6"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M6 18L18 6M6 6l12 12"
+            ></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6 space-y-4">
+        <!-- Nama Wallet -->
+        <div>
+          <label class="block text-sm font-medium mb-1 text-slate-600"
+            >Nama Wallet <span class="text-red-500">*</span></label
+          >
+          <input
+            type="text"
+            x-model="form.wallet_name"
+            class="w-full p-2.5 rounded-lg border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none"
+            placeholder="Contoh: Kas, Bank Mandiri, dll"
+          />
+        </div>
+
+        <!-- Deskripsi -->
+        <div>
+          <label class="block text-sm font-medium mb-1 text-slate-600"
+            >Deskripsi</label
+          >
+          <textarea
+            x-model="form.description"
+            rows="2"
+            class="w-full p-2.5 rounded-lg border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none"
+            placeholder="Keterangan tambahan (opsional)"
+          ></textarea>
+        </div>
+
+        <!-- Saldo Awal -->
+        <div>
+          <label class="block text-sm font-medium mb-1 text-slate-600"
+            >Saldo (Rp)</label
+          >
+          <input
+            type="text"
+            id="saldoInput"
+            :value="form.saldo_display"
+            class="w-full p-2.5 rounded-lg border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none"
+            placeholder="0"
+          />
+          <input type="hidden" x-model="form.saldo" name="saldo" />
+          <p class="text-xs text-slate-400 mt-1">
+            Saldo awal / saldo terkini dompet ini
+          </p>
+        </div>
+
+        <!-- Default Toggle -->
+        <div>
+          <label class="block text-sm font-medium mb-2 text-slate-600"
+            >Wallet Default</label
+          >
+          <label
+            class="flex items-center gap-3 cursor-pointer select-none w-fit"
+          >
+            <div class="relative">
+              <input
+                type="checkbox"
+                x-model="form.is_default"
+                class="sr-only"
+              />
+              <div
+                :class="form.is_default ? 'bg-yellow-400' : 'bg-slate-300'"
+                class="w-11 h-6 rounded-full transition-colors duration-200"
+              ></div>
+              <div
+                :class="form.is_default ? 'translate-x-5' : 'translate-x-0'"
+                class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
+              ></div>
+            </div>
+            <span
+              x-text="form.is_default ? 'Ya, jadikan default' : 'Bukan default'"
+              :class="form.is_default ? 'text-yellow-600 font-semibold' : 'text-slate-500'"
+              class="text-sm"
+            ></span>
+          </label>
+          <p class="text-xs text-slate-400 mt-1">
+            Wallet default digunakan sebagai dompet utama transaksi
+          </p>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="flex justify-end gap-3 px-6 pb-6">
+        <button
+          type="button"
+          @click="closeModal()"
+          class="px-4 py-2 rounded-lg font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+        >
+          Batal
+        </button>
+        <button
+          type="button"
+          @click="submitForm()"
+          :disabled="isSubmitting"
+          class="px-6 py-2 bg-[#005596] hover:bg-blue-800 text-white rounded-lg font-bold shadow-lg shadow-blue-500/30 transition-all flex items-center gap-2"
+        >
+          <span
+            x-show="isSubmitting"
+            class="w-4 h-4 border-2 border-white border-l-transparent rounded-full animate-spin"
+          ></span>
+          <span x-text="isEdit ? 'Update' : 'Simpan'"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DataTables -->
+<link rel="stylesheet" href="/static/vendor/jquery.dataTables.min.css" />
+<script src="/static/vendor/jquery-3.7.1.min.js"></script>
+<script src="/static/vendor/jquery.dataTables.min.js"></script>
+<style>
+  .dataTables_wrapper .dataTables_filter {
+    display: none;
+  }
+  .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+    background: #005596 !important;
+    color: white !important;
+    border: none;
+    border-radius: 0.5rem;
+  }
+  .dataTables_wrapper .dataTables_paginate .paginate_button {
+    border-radius: 0.5rem;
+  }
+  .dataTables_wrapper .dataTables_info {
+    font-size: 0.8rem;
+    color: #64748b;
+  }
+  .dataTables_wrapper .dataTables_length select {
+    border-radius: 0.5rem;
+    border: 1px solid #cbd5e1;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.85rem;
+  }
+</style>
+<script>
+  function formatIDR(val) {
+    if (val === null || val === undefined || val === "") return "0";
+    const num = parseInt(String(val).replace(/\D/g, ""), 10);
+    if (isNaN(num)) return "0";
+    return num.toLocaleString("id-ID");
+  }
+
+  function formatInputIDR(val) {
+    if (!val && val !== 0) return "";
+    const digits = String(val).replace(/\D/g, "");
+    if (!digits) return "";
+    const num = parseInt(digits, 10);
+    return isNaN(num) ? "" : num.toLocaleString("id-ID");
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    const table = $("#walletTable").DataTable({
+      language: {
+        search: "Cari:",
+        lengthMenu: "Tampilkan _MENU_ data",
+        info: "Menampilkan _START_ hingga _END_ dari _TOTAL_ data",
+        infoEmpty: "Tidak ada data",
+        infoFiltered: "(disaring dari _MAX_ total data)",
+        zeroRecords: "Tidak ada data yang sesuai",
+        emptyTable: "Tidak ada data tersedia",
+        paginate: {
+          first: "Pertama",
+          last: "Terakhir",
+          next: "Berikutnya",
+          previous: "Sebelumnya",
+        },
+      },
+      order: [[0, "asc"]],
+      columnDefs: [{ orderable: false, targets: -1 }],
+    });
+    document
+      .getElementById("searchWallet")
+      .addEventListener("keyup", function () {
+        table.search(this.value).draw();
+      });
+  });
+
+  function walletManager() {
+    return {
+      isOpen: false,
+      isEdit: false,
+      isSubmitting: false,
+      form: {
+        id: null,
+        wallet_name: "",
+        is_default: false,
+        description: "",
+        saldo: "0",
+        saldo_display: "",
+      },
+
+      resetForm() {
+        this.form = {
+          id: null,
+          wallet_name: "",
+          is_default: false,
+          description: "",
+          saldo: "0",
+          saldo_display: "",
+        };
+      },
+
+      openCreateModal() {
+        this.resetForm();
+        this.isEdit = false;
+        this.isOpen = true;
+        this.attachSaldoListener();
+      },
+
+      openEditModal(id, walletName, isDefault, description, saldo) {
+        this.resetForm();
+        this.isEdit = true;
+        this.isOpen = true;
+        this.form.id = id;
+        this.form.wallet_name = walletName;
+        this.form.is_default = isDefault;
+        this.form.description = description;
+        this.form.saldo = String(saldo);
+        this.form.saldo_display = formatIDR(saldo);
+        this.attachSaldoListener();
+      },
+
+      closeModal() {
+        if (!this.isSubmitting) {
+          this.isOpen = false;
+          this.resetForm();
+          const el = document.getElementById("saldoInput");
+          if (el) el._saldoListenerAttached = false;
+        }
+      },
+
+      attachSaldoListener() {
+        this.$nextTick(() => {
+          const el = document.getElementById("saldoInput");
+          if (!el || el._saldoListenerAttached) return;
+          el._saldoListenerAttached = true;
+          el.addEventListener("input", () => {
+            const digits = el.value.replace(/\D/g, "");
+            if (!digits) {
+              this.form.saldo = "0";
+              this.form.saldo_display = "";
+              el.value = "";
+              return;
+            }
+            const num = parseInt(digits, 10);
+            const formatted = isNaN(num) ? "" : num.toLocaleString("id-ID");
+            this.form.saldo = String(num || 0);
+            this.form.saldo_display = formatted;
+            el.value = formatted;
+          });
+        });
+      },
+
+      async submitForm() {
+        if (!this.form.wallet_name.trim()) {
+          Swal.fire({
+            icon: "warning",
+            title: "Nama wallet wajib diisi",
+            confirmButtonColor: "#005596",
+          });
+          return;
+        }
+        this.isSubmitting = true;
+        try {
+          const url = this.isEdit
+            ? `/master/keuangan/wallet/${this.form.id}`
+            : "/master/keuangan/wallet";
+          const fd = new FormData();
+          fd.append("wallet_name", this.form.wallet_name);
+          fd.append("is_default", this.form.is_default ? "true" : "false");
+          fd.append("description", this.form.description);
+          fd.append("saldo", this.form.saldo);
+
+          const res = await fetch(url, { method: "POST", body: fd });
+          const json = await res.json();
+          if (json.status) {
+            Swal.fire({
+              icon: "success",
+              title: "Berhasil!",
+              text: json.message,
+              timer: 1500,
+              showConfirmButton: false,
+            }).then(() => location.reload());
+          } else {
+            Swal.fire({
+              icon: "error",
+              title: "Gagal",
+              text: json.message,
+              confirmButtonColor: "#005596",
+            });
+          }
+        } catch (e) {
+          Swal.fire({
+            icon: "error",
+            title: "Error",
+            text: "Terjadi kesalahan pada server",
+            confirmButtonColor: "#005596",
+          });
+        } finally {
+          this.isSubmitting = false;
+        }
+      },
+
+      async confirmDelete(id, nama) {
+        const result = await Swal.fire({
+          icon: "warning",
+          title: "Hapus Wallet?",
+          html: `Data <strong>"${nama}"</strong> akan dihapus permanen.`,
+          showCancelButton: true,
+          confirmButtonColor: "#dc2626",
+          cancelButtonColor: "#64748b",
+          confirmButtonText: "Ya, Hapus",
+          cancelButtonText: "Batal",
+        });
+        if (!result.isConfirmed) return;
+        try {
+          const res = await fetch(`/master/keuangan/wallet/${id}/delete`, {
+            method: "POST",
+          });
+          const json = await res.json();
+          if (json.status) {
+            Swal.fire({
+              icon: "success",
+              title: "Dihapus",
+              text: json.message,
+              timer: 1500,
+              showConfirmButton: false,
+            }).then(() => location.reload());
+          } else {
+            Swal.fire({
+              icon: "error",
+              title: "Gagal",
+              text: json.message,
+              confirmButtonColor: "#005596",
+            });
+          }
+        } catch (e) {
+          Swal.fire({
+            icon: "error",
+            title: "Error",
+            text: "Terjadi kesalahan pada server",
+            confirmButtonColor: "#005596",
+          });
+        }
+      },
+    };
+  }
+</script>
+
+{{ template "footer.html" . }} {{ end }}

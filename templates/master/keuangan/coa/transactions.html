@@ -1,0 +1,122 @@
+{{ define "master/keuangan/coa/transactions.html" }}
+{{ template "header.html" . }}
+
+<div class="space-y-6">
+
+  <!-- Breadcrumb + Header -->
+  <div>
+    <nav class="text-sm text-slate-400 mb-2">
+      <a href="/master/keuangan/coa" class="hover:text-[#005596] transition-colors">Chart of Account</a>
+      <span class="mx-2">/</span>
+      <span class="text-slate-600 font-medium">{{ .COA.Code }} — {{ .COA.Name }}</span>
+    </nav>
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div>
+        <h2 class="text-2xl font-bold text-slate-800">Buku Besar — {{ .COA.Code }}</h2>
+        <p class="text-slate-500 text-sm mt-1">{{ .COA.Name }}
+          {{ if .COA.COAType }}
+          <span class="mx-1">·</span>
+          <span class="font-medium
+            {{ if eq .COA.COAType.Code "1" }}text-blue-600{{ else if eq .COA.COAType.Code "2" }}text-red-600{{ else if eq .COA.COAType.Code "3" }}text-purple-600{{ else if eq .COA.COAType.Code "4" }}text-green-600{{ else if eq .COA.COAType.Code "5" }}text-orange-600{{ else }}text-amber-600{{ end }}">
+            {{ .COA.COAType.Code }} — {{ .COA.COAType.Name }}
+          </span>
+          <span class="mx-1">·</span>
+          Normal Balance:
+          <strong>{{ if eq .COA.COAType.NormalBalance "debit" }}Debit{{ else }}Kredit{{ end }}</strong>
+          {{ end }}
+        </p>
+      </div>
+      <a href="/master/keuangan/coa" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+        Kembali ke COA
+      </a>
+    </div>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+      <p class="text-xs text-slate-500 mb-1">Total Debit</p>
+      <p class="text-xl font-bold text-slate-800">Rp {{ formatIDR .TotalDebit }}</p>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+      <p class="text-xs text-slate-500 mb-1">Total Kredit</p>
+      <p class="text-xl font-bold text-slate-800">Rp {{ formatIDR .TotalCredit }}</p>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+      <p class="text-xs text-slate-500 mb-1">Saldo Akhir</p>
+      {{ $balance := 0 }}
+      {{ range .Entries }}
+      {{ $balance = .Balance }}
+      {{ end }}
+      <p class="text-xl font-bold {{ if lt $balance 0 }}text-red-600{{ else }}text-[#005596]{{ end }}">
+        Rp {{ formatIDR $balance }}
+        {{ if lt $balance 0 }}<span class="text-sm font-normal">(negatif)</span>{{ end }}
+      </p>
+    </div>
+  </div>
+
+  <!-- Transactions Table -->
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+    <div class="p-5 border-b border-slate-100 flex items-center justify-between">
+      <h3 class="font-semibold text-slate-700">Riwayat Transaksi</h3>
+      <span class="text-sm text-slate-400">{{ len .Entries }} transaksi</span>
+    </div>
+
+    {{ if .Entries }}
+    <div class="overflow-x-auto">
+      <table class="w-full text-left border-collapse text-sm">
+        <thead>
+          <tr class="bg-slate-50 border-b border-slate-200">
+            <th class="p-3 font-semibold text-slate-600 w-32">Tanggal</th>
+            <th class="p-3 font-semibold text-slate-600">Keterangan</th>
+            <th class="p-3 font-semibold text-slate-600 w-24">Ref</th>
+            <th class="p-3 font-semibold text-slate-600 text-right w-36">Debit (Rp)</th>
+            <th class="p-3 font-semibold text-slate-600 text-right w-36">Kredit (Rp)</th>
+            <th class="p-3 font-semibold text-slate-600 text-right w-36">Saldo (Rp)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{ range .Entries }}
+          <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+            <td class="p-3 text-slate-500 font-mono">{{ .TransDate.Format "02/01/2006" }}</td>
+            <td class="p-3 text-slate-700">
+              {{ .Description }}
+              {{ if .Wallet }}<span class="ml-1 text-xs text-slate-400">· {{ .Wallet.WalletName }}</span>{{ end }}
+            </td>
+            <td class="p-3">
+              {{ if .RefType }}
+              <span class="px-1.5 py-0.5 rounded text-xs bg-slate-100 text-slate-600 font-mono">{{ .RefType }}</span>
+              {{ else }}
+              <span class="text-slate-300">—</span>
+              {{ end }}
+            </td>
+            <td class="p-3 text-right font-mono {{ if gt .Debit 0 }}text-slate-800 font-semibold{{ else }}text-slate-300{{ end }}">
+              {{ if gt .Debit 0 }}{{ formatIDR .Debit }}{{ else }}—{{ end }}
+            </td>
+            <td class="p-3 text-right font-mono {{ if gt .Credit 0 }}text-slate-800 font-semibold{{ else }}text-slate-300{{ end }}">
+              {{ if gt .Credit 0 }}{{ formatIDR .Credit }}{{ else }}—{{ end }}
+            </td>
+            <td class="p-3 text-right font-mono font-semibold {{ if lt .Balance 0 }}text-red-600{{ else }}text-[#005596]{{ end }}">
+              {{ formatIDR .Balance }}
+            </td>
+          </tr>
+          {{ end }}
+        </tbody>
+      </table>
+    </div>
+    {{ else }}
+    <div class="py-16 text-center">
+      <svg class="w-12 h-12 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+      </svg>
+      <p class="text-slate-400 font-medium">Belum ada transaksi</p>
+      <p class="text-slate-400 text-sm mt-1">Transaksi akan muncul di sini saat modul transaksi aktif</p>
+    </div>
+    {{ end }}
+  </div>
+
+</div>
+
+{{ template "footer.html" . }}
+{{ end }}

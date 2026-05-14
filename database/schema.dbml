@@ -1,0 +1,335 @@
+// ============================================================
+// SPBU GO — Database Schema
+// Generated for dbdiagram.io VS Code Extension
+// Last updated: 2026-04-19
+// ============================================================
+
+Project spbu_go {
+  database_type: 'PostgreSQL'
+  Note: 'Sistem Manajemen Internal SPBU — Modular Monolith'
+}
+
+// ============================================================
+// AUTH & ROLES
+// ============================================================
+
+Table roles {
+  id          serial      [pk, increment]
+  name        varchar(255) [not null, note: 'Display name, e.g. Administrator']
+  code        varchar(255) [not null, unique, note: 'Slug code, e.g. admin, staff']
+  created_at  timestamp   [default: `now()`]
+  updated_at  timestamp   [default: `now()`]
+  deleted_at  timestamp   [null, note: 'Soft delete']
+
+  Note: 'Role / kelompok hak akses pengguna'
+}
+
+Table permissions {
+  id          serial      [pk, increment]
+  name        varchar(255) [not null]
+  code        varchar(255) [not null, unique, note: 'e.g. user_manage, dashboard_view']
+  created_at  timestamp   [default: `now()`]
+  updated_at  timestamp   [default: `now()`]
+  deleted_at  timestamp   [null]
+
+  Note: 'Daftar izin akses fitur'
+}
+
+Table role_permissions {
+  role_id       int   [not null, ref: > roles.id]
+  permission_id int   [not null, ref: > permissions.id]
+
+  indexes {
+    (role_id, permission_id) [pk]
+  }
+
+  Note: 'Pivot many-to-many: roles ↔ permissions'
+}
+
+Table users {
+  id          serial        [pk, increment]
+  first_name  varchar(50)   [not null]
+  last_name   varchar(50)   [default: '']
+  username    varchar(255)  [not null, unique]
+  password    varchar(255)  [not null, note: 'bcrypt hash']
+  email       varchar(254)  [default: '']
+  phone       varchar(20)   [default: '']
+  active      boolean       [default: true]
+  role_id     int           [not null, ref: > roles.id]
+  created_at  timestamp     [default: `now()`]
+  updated_at  timestamp     [default: `now()`]
+  deleted_at  timestamp     [null, note: 'Soft delete']
+
+  Note: 'Pengguna sistem (login, session-based auth)'
+}
+
+// ============================================================
+// SETTINGS
+// ============================================================
+
+Table settings {
+  id            serial        [pk, increment]
+  setting_name  varchar(100)  [not null, unique, note: 'Key, e.g. app_name, favicon, stock_decimal_places']
+  setting_value varchar(255)  [not null, default: '']
+  created_at    timestamp     [default: `now()`]
+  updated_at    timestamp     [default: `now()`]
+  deleted_at    timestamp     [null]
+
+  Note: 'Key-value store untuk konfigurasi aplikasi runtime'
+}
+
+// ============================================================
+// MASTER — BBM (Bahan Bakar Minyak)
+// ============================================================
+
+Table bbm {
+  id              serial          [pk, increment]
+  name            varchar(255)    [not null, note: 'Nama BBM, e.g. Pertalite, Pertamax']
+  margin          decimal(15,2)   [default: 0, note: 'Margin per liter (Rp)']
+  price           decimal(15,2)   [default: 0, note: 'Harga jual per liter (Rp)']
+  stock           bigint          [default: 0, note: 'Stok dalam satuan terkecil × 10^stock_decimal_places']
+  reward_percent  decimal(5,2)    [default: 0, note: 'Persentase reward penjualan (%)']
+  is_active       boolean         [default: true]
+  updated_by      int             [null, ref: > users.id]
+  created_at      timestamp       [default: `now()`]
+  updated_at      timestamp       [default: `now()`]
+  deleted_at      timestamp       [null]
+
+  Note: 'Jenis bahan bakar yang dijual di SPBU'
+}
+
+// ============================================================
+// MASTER — TIANG & NOZZLE
+// ============================================================
+
+Table tiang {
+  id          serial        [pk, increment]
+  name        varchar(255)  [not null, note: 'Nama dispenser, e.g. Tiang 1']
+  slug        varchar(255)  [not null, unique, note: 'URL-friendly identifier, e.g. tiang1']
+  updated_by  int           [null, ref: > users.id]
+  created_at  timestamp     [default: `now()`]
+  updated_at  timestamp     [default: `now()`]
+  deleted_at  timestamp     [null]
+
+  Note: 'Dispenser / pompa BBM di SPBU'
+}
+
+Table nozzles {
+  id          serial        [pk, increment]
+  tiang_id    int           [not null, ref: > tiang.id, note: 'Cascade delete']
+  bbm_id      int           [not null, ref: > bbm.id, note: 'Restrict delete']
+  description varchar(255)  [null, note: 'Keterangan nozzle opsional']
+  is_active   boolean       [default: true]
+  updated_by  int           [null, ref: > users.id]
+  created_at  timestamp     [default: `now()`]
+  updated_at  timestamp     [default: `now()`]
+  deleted_at  timestamp     [null]
+
+  Note: 'Nozzle pada setiap tiang, terhubung ke satu jenis BBM'
+}
+
+// ============================================================
+// MASTER — PARTNER (Pelanggan B2B)
+// ============================================================
+
+Table partners {
+  id              serial        [pk, increment]
+  name            varchar(255)  [not null, note: 'Nama perusahaan / mitra']
+  contact_person  varchar(255)  [null]
+  phone           varchar(50)   [null]
+  address         text          [null]
+  is_active       boolean       [default: true]
+  updated_by      int           [null, ref: > users.id]
+  created_at      timestamp     [default: `now()`]
+  updated_at      timestamp     [default: `now()`]
+  deleted_at      timestamp     [null]
+
+  Note: 'Mitra usaha / pelanggan kredit B2B'
+}
+
+// ============================================================
+// MASTER — KARYAWAN (Employee Management)
+// ============================================================
+
+Table jabatan {
+  id            serial        [pk, increment]
+  kode_jabatan  varchar(10)   [not null, unique, note: 'Kode singkat, e.g. OPR, KSR, SPV']
+  nama_jabatan  varchar(50)   [not null]
+  reward_persen decimal(5,2)  [default: 0, note: 'Persentase reward dari penjualan BBM (%)']
+  is_active     boolean       [default: true]
+  created_at    timestamp     [default: `now()`]
+  updated_at    timestamp     [default: `now()`]
+  deleted_at    timestamp     [null]
+
+  Note: 'Posisi / jabatan karyawan (Operator, Kasir, Supervisor, dll)'
+}
+
+Table karyawan {
+  id                serial        [pk, increment]
+  nik               varchar(20)   [not null, unique, note: 'Nomor Induk Karyawan']
+  nama_lengkap      varchar(100)  [not null]
+  gaji_pokok        bigint        [default: 0, note: 'Gaji pokok dalam Rupiah (integer)']
+  alamat            text          [null]
+  tempat_lahir      varchar(50)   [null]
+  tanggal_lahir     date          [null]
+  status_nikah      varchar(15)   [null, note: 'lajang | menikah | cerai']
+  jumlah_anak       int           [default: 0]
+  jabatan_id        int           [null, ref: > jabatan.id]
+  jenis_kelamin     varchar(1)    [null, note: 'L = Laki-laki, P = Perempuan']
+  agama             varchar(20)   [null]
+  no_hp             varchar(20)   [null]
+  pendidikan        varchar(20)   [null, note: 'SD, SMP, SMA, D3, S1, S2']
+  tgl_pengangkatan  date          [null]
+  tgl_keluar        date          [null, note: 'NULL = masih aktif']
+  foto              varchar(255)  [null, note: 'Path file foto karyawan']
+  is_active         boolean       [default: true]
+  updated_by        int           [null, ref: > users.id]
+  created_at        timestamp     [default: `now()`]
+  updated_at        timestamp     [default: `now()`]
+  deleted_at        timestamp     [null]
+
+  Note: 'Data karyawan SPBU'
+}
+
+Table pendapatan {
+  id               serial        [pk, increment]
+  nama_pendapatan  varchar(100)  [not null, note: 'Nama komponen pendapatan, e.g. Tunjangan Makan']
+  tipe             varchar(10)   [not null, default: 'nominal', note: 'nominal | persen']
+  nilai            bigint        [default: 0, note: 'Nominal (Rp integer) atau persentase × 100 (jika persen)']
+  deskripsi        text          [null]
+  is_active        boolean       [default: true]
+  updated_by       int           [null, ref: > users.id]
+  created_at       timestamp     [default: `now()`]
+  updated_at       timestamp     [default: `now()`]
+  deleted_at       timestamp     [null]
+
+  Note: 'Komponen pendapatan / tunjangan tambahan karyawan di luar gaji pokok'
+}
+
+Table potongan {
+  id             serial       [pk, increment]
+  kode_potongan  varchar(10)  [not null, unique, note: 'Kode singkat, e.g. BPJS, PPH21']
+  nama_potongan  varchar(100) [not null]
+  tipe           varchar(10)  [not null, default: 'nominal', note: 'nominal | persen']
+  nilai          bigint       [default: 0, note: 'Nominal (Rp) atau persentase dari gaji pokok']
+  deskripsi      text         [null]
+  is_active      boolean      [default: true]
+  updated_by     int          [null, ref: > users.id]
+  created_at     timestamp    [default: `now()`]
+  updated_at     timestamp    [default: `now()`]
+  deleted_at     timestamp    [null]
+
+  Note: 'Komponen potongan yang dibebankan kepada karyawan'
+}
+
+Table karyawan_pendapatan {
+  karyawan_id    int  [not null, ref: > karyawan.id]
+  pendapatan_id  int  [not null, ref: > pendapatan.id]
+
+  indexes {
+    (karyawan_id, pendapatan_id) [pk]
+  }
+
+  Note: 'Junction table — pendapatan yang dipilih per karyawan'
+}
+
+Table karyawan_potongan {
+  karyawan_id  int  [not null, ref: > karyawan.id]
+  potongan_id  int  [not null, ref: > potongan.id]
+
+  indexes {
+    (karyawan_id, potongan_id) [pk]
+  }
+
+  Note: 'Junction table — potongan yang dipilih per karyawan'
+}
+
+// ============================================================
+// TRANSACTION — PENEBUSAN BBM
+// ============================================================
+
+Table trx_penebusan {
+  id             bigserial    [pk, increment]
+  no_penebusan   varchar(25)  [not null, unique, note: 'Auto generate: PNB/YYYY/MM/NNNN']
+  no_so          varchar(25)  [null, note: 'No SO dari Pertamina']
+  tgl_penebusan  date         [not null]
+  tgl_bayar      date         [null]
+  wallet_id      int          [null, note: 'FK ke wallets.id']
+  adm_bank       bigint       [not null, default: 0]
+  status         varchar(2)   [not null, default: 'DR', note: 'DR (Draft) | CO (Complete)']
+  catatan        text         [null]
+  subtotal       bigint       [not null, default: 0]
+  total_ppn      bigint       [not null, default: 0]
+  total_bayar    bigint       [not null, default: 0]
+  updated_by     int          [null, ref: > users.id]
+  created_at     timestamp    [default: `now()`]
+  updated_at     timestamp    [default: `now()`]
+  deleted_at     timestamp    [null]
+
+  Note: 'Header transaksi penebusan BBM ke Pertamina'
+}
+
+Table trx_penebusan_detail {
+  id            bigserial      [pk, increment]
+  penebusan_id  bigint         [not null, ref: > trx_penebusan.id]
+  bbm_id        int            [not null, ref: > bbm.id]
+  jml_liter     bigint         [not null]
+  harga_dasar   bigint         [not null]
+  harga_jual    bigint         [not null]
+  margin        bigint         [not null, default: 0]
+  ppn_persen    decimal(5,2)   [not null, default: 0]
+  ppn_rp        bigint         [not null, default: 0]
+  subtotal      bigint         [not null, default: 0]
+  total         bigint         [not null, default: 0]
+  created_at    timestamp      [default: `now()`]
+  updated_at    timestamp      [default: `now()`]
+
+  Note: 'Detail item per jenis BBM pada transaksi penebusan'
+}
+
+// ============================================================
+// ENUM NOTES (PostgreSQL — informational only)
+// ============================================================
+// tipe_pendapatan : nominal | persen
+// status_nikah    : lajang | menikah | cerai
+// jenis_kelamin   : L | P
+// pendidikan      : SD | SMP | SMA | D3 | S1 | S2 | S3
+
+// ============================================================
+// TABLEGROUP — Visual Grouping
+// ============================================================
+
+TableGroup auth {
+  roles
+  permissions
+  role_permissions
+  users
+}
+
+TableGroup master_bbm {
+  bbm
+  tiang
+  nozzles
+}
+
+TableGroup master_mitra {
+  partners
+}
+
+TableGroup master_karyawan {
+  jabatan
+  karyawan
+  karyawan_pendapatan
+  karyawan_potongan
+  pendapatan
+  potongan
+}
+
+TableGroup config {
+  settings
+}
+
+TableGroup transaction {
+  trx_penebusan
+  trx_penebusan_detail
+}

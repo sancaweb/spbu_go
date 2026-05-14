@@ -1,170 +1,287 @@
-{{ define "settings/index.html" }}
-{{ template "header.html" . }}
+{{ define "settings/index.html" }} {{ template "header.html" . }}
 
 <div x-data="siteSettings()">
-    <div class="flex justify-between items-center mb-6">
+  <div class="flex justify-between items-center mb-6">
+    <div>
+      <h2 class="text-3xl font-bold text-slate-800">Site Settings</h2>
+      <p class="text-slate-500">Manage application configuration</p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <!-- Favicon Upload -->
+    <div class="glass-card rounded-2xl p-6 shadow-lg">
+      <div class="flex items-center gap-3 mb-4">
+        <div
+          class="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600"
+        >
+          <svg
+            class="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+            ></path>
+          </svg>
+        </div>
         <div>
-            <h2 class="text-3xl font-bold text-slate-800">Site Settings</h2>
-            <p class="text-slate-500">Manage application configuration</p>
+          <h3 class="text-lg font-bold text-slate-800">Favicon</h3>
+          <p class="text-xs text-slate-500">
+            Icon displayed on the browser tab
+          </p>
         </div>
+      </div>
+      <div class="mb-4">
+        <div class="flex items-center gap-4 mb-4">
+          <div
+            class="w-16 h-16 rounded-xl border-2 border-dashed border-slate-300 flex items-center justify-center bg-slate-50 overflow-hidden"
+          >
+            <img
+              :src="faviconPreview || currentFavicon"
+              class="w-12 h-12 object-contain"
+              alt="Favicon"
+            />
+          </div>
+          <div class="text-sm text-slate-500">
+            <p class="font-medium text-slate-700">Current Favicon</p>
+            <p class="text-xs">Supported: PNG, ICO, JPG, SVG, WebP</p>
+          </div>
+        </div>
+        <label
+          class="flex items-center justify-center w-full px-4 py-3 border-2 border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-[#005596] hover:bg-blue-50/50 transition"
+        >
+          <input
+            type="file"
+            accept=".png,.ico,.jpg,.jpeg,.svg,.webp"
+            @change="previewFavicon($event)"
+            class="hidden"
+          />
+          <span class="text-sm text-slate-500">
+            <span class="text-[#005596] font-medium">Click to upload</span> a
+            new favicon
+          </span>
+        </label>
+      </div>
+      <button
+        @click="uploadFavicon()"
+        :disabled="!faviconFile || isSubmitting"
+        :class="!faviconFile ? 'opacity-50 cursor-not-allowed' : ''"
+        class="w-full px-4 py-2.5 bg-[#005596] hover:bg-blue-800 text-white rounded-xl font-medium shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2"
+      >
+        <span
+          x-show="isSubmitting"
+          class="w-4 h-4 border-2 border-white border-l-transparent rounded-full animate-spin"
+        ></span>
+        Upload Favicon
+      </button>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- Favicon Upload -->
-        <div class="glass-card rounded-2xl p-6 shadow-lg">
-            <div class="flex items-center gap-3 mb-4">
-                <div class="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                </div>
-                <div>
-                    <h3 class="text-lg font-bold text-slate-800">Favicon</h3>
-                    <p class="text-xs text-slate-500">Icon displayed on the browser tab</p>
-                </div>
-            </div>
-            <div class="mb-4">
-                <div class="flex items-center gap-4 mb-4">
-                    <div class="w-16 h-16 rounded-xl border-2 border-dashed border-slate-300 flex items-center justify-center bg-slate-50 overflow-hidden">
-                        <img :src="faviconPreview || currentFavicon" class="w-12 h-12 object-contain" alt="Favicon">
-                    </div>
-                    <div class="text-sm text-slate-500">
-                        <p class="font-medium text-slate-700">Current Favicon</p>
-                        <p class="text-xs">Supported: PNG, ICO, JPG, SVG, WebP</p>
-                    </div>
-                </div>
-                <label class="flex items-center justify-center w-full px-4 py-3 border-2 border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-[#005596] hover:bg-blue-50/50 transition">
-                    <input type="file" accept=".png,.ico,.jpg,.jpeg,.svg,.webp" @change="previewFavicon($event)" class="hidden">
-                    <span class="text-sm text-slate-500">
-                        <span class="text-[#005596] font-medium">Click to upload</span> a new favicon
-                    </span>
-                </label>
-            </div>
-            <button @click="uploadFavicon()" 
-                    :disabled="!faviconFile || isSubmitting"
-                    :class="!faviconFile ? 'opacity-50 cursor-not-allowed' : ''"
-                    class="w-full px-4 py-2.5 bg-[#005596] hover:bg-blue-800 text-white rounded-xl font-medium shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2">
-                <span x-show="isSubmitting" class="w-4 h-4 border-2 border-white border-l-transparent rounded-full animate-spin"></span>
-                Upload Favicon
-            </button>
+    <!-- Stock Decimal Precision -->
+    <div class="glass-card rounded-2xl p-6 shadow-lg">
+      <div class="flex items-center gap-3 mb-4">
+        <div
+          class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-[#005596]"
+        >
+          <svg
+            class="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"
+            ></path>
+          </svg>
         </div>
-
-        <!-- Stock Decimal Precision -->
-        <div class="glass-card rounded-2xl p-6 shadow-lg">
-            <div class="flex items-center gap-3 mb-4">
-                <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-[#005596]">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"></path></svg>
-                </div>
-                <div>
-                    <h3 class="text-lg font-bold text-slate-800">Stock Decimal Places</h3>
-                    <p class="text-xs text-slate-500">Number of decimal places for BBM stock values</p>
-                </div>
-            </div>
-            <div class="mb-4">
-                <div class="flex gap-2 flex-wrap">
-                    <template x-for="n in [0, 1, 2, 3, 4, 5, 6, 7, 8]" :key="n">
-                        <button type="button"
-                                @click="settings.stock_decimal_places = n"
-                                :class="settings.stock_decimal_places == n ? 'bg-[#005596] text-white shadow-lg' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
-                                class="w-12 h-12 rounded-xl font-bold text-lg transition"
-                                x-text="n">
-                        </button>
-                    </template>
-                </div>
-                <p class="text-xs text-slate-400 mt-3">
-                    Preview: <span class="font-mono font-bold text-slate-600" x-text="previewDecimal(settings.stock_decimal_places)"></span>
-                </p>
-            </div>
-            <button @click="saveSetting('stock_decimal_places', settings.stock_decimal_places)" 
-                    :disabled="isSubmitting"
-                    class="w-full px-4 py-2.5 bg-[#005596] hover:bg-blue-800 text-white rounded-xl font-medium shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2">
-                <span x-show="isSubmitting" class="w-4 h-4 border-2 border-white border-l-transparent rounded-full animate-spin"></span>
-                Save Changes
-            </button>
+        <div>
+          <h3 class="text-lg font-bold text-slate-800">Stock Decimal Places</h3>
+          <p class="text-xs text-slate-500">
+            Number of decimal places for BBM stock values
+          </p>
         </div>
+      </div>
+      <div class="mb-4">
+        <div class="flex gap-2 flex-wrap">
+          <template x-for="n in [0, 1, 2, 3, 4, 5, 6, 7, 8]" :key="n">
+            <button
+              type="button"
+              @click="settings.stock_decimal_places = n"
+              :class="settings.stock_decimal_places == n ? 'bg-[#005596] text-white shadow-lg' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+              class="w-12 h-12 rounded-xl font-bold text-lg transition"
+              x-text="n"
+            ></button>
+          </template>
+        </div>
+        <p class="text-xs text-slate-400 mt-3">
+          Preview:
+          <span
+            class="font-mono font-bold text-slate-600"
+            x-text="previewDecimal(settings.stock_decimal_places)"
+          ></span>
+        </p>
+      </div>
+      <button
+        @click="saveSetting('stock_decimal_places', settings.stock_decimal_places)"
+        :disabled="isSubmitting"
+        class="w-full px-4 py-2.5 bg-[#005596] hover:bg-blue-800 text-white rounded-xl font-medium shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2"
+      >
+        <span
+          x-show="isSubmitting"
+          class="w-4 h-4 border-2 border-white border-l-transparent rounded-full animate-spin"
+        ></span>
+        Save Changes
+      </button>
     </div>
+
+    <!-- Penebusan Tax Multiplier -->
+    <div class="glass-card rounded-2xl p-6 shadow-lg">
+      <div class="flex items-center gap-3 mb-4">
+        <div
+          class="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600"
+        >
+          <svg
+            class="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            ></path>
+          </svg>
+        </div>
+        <div>
+          <h3 class="text-lg font-bold text-slate-800">
+            Pajak Penebusan (Multiplier)
+          </h3>
+          <p class="text-xs text-slate-500">
+            Nilai pengali pajak untuk perhitungan di form Penebusan
+          </p>
+        </div>
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-slate-600 mb-1.5"
+          >Nilai Multiplier</label
+        >
+        <input
+          type="text"
+          x-model="settings.penebusan_tax_multiplier"
+          placeholder="0.0025"
+          class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
+        />
+        <p class="text-xs text-slate-400 mt-2">
+          Contoh: 0.0025 (default). Formula dipakai di Penebusan: (100 / 116) ×
+          jmlLiter × hargaBBM × multiplier.
+        </p>
+      </div>
+      <button
+        @click="saveSetting('penebusan_tax_multiplier', settings.penebusan_tax_multiplier)"
+        :disabled="isSubmitting"
+        class="w-full px-4 py-2.5 bg-[#005596] hover:bg-blue-800 text-white rounded-xl font-medium shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2"
+      >
+        <span
+          x-show="isSubmitting"
+          class="w-4 h-4 border-2 border-white border-l-transparent rounded-full animate-spin"
+        ></span>
+        Save Pajak Penebusan
+      </button>
+    </div>
+  </div>
 </div>
 
 <script>
-    document.addEventListener('alpine:init', () => {
-        Alpine.data('siteSettings', () => ({
-            isSubmitting: false,
-            settings: {
-                stock_decimal_places: {{ if index .Settings "stock_decimal_places" }}{{ index .Settings "stock_decimal_places" }}{{ else }}0{{ end }},
-            },
-            currentFavicon: '{{ if index .Settings "favicon" }}{{ index .Settings "favicon" }}{{ else }}/static/favicon.png{{ end }}',
-            faviconFile: null,
-            faviconPreview: null,
+  document.addEventListener('alpine:init', () => {
+      Alpine.data('siteSettings', () => ({
+          isSubmitting: false,
+          settings: {
+              stock_decimal_places: {{ if index .Settings "stock_decimal_places" }}{{ index .Settings "stock_decimal_places" }}{{ else }}0{{ end }},
+              penebusan_tax_multiplier: '{{ if index .Settings "penebusan_tax_multiplier" }}{{ index .Settings "penebusan_tax_multiplier" }}{{ else }}0.0025{{ end }}',
+          },
+          currentFavicon: '{{ if index .Settings "favicon" }}{{ index .Settings "favicon" }}{{ else }}/static/favicon.png{{ end }}',
+          faviconFile: null,
+          faviconPreview: null,
 
-            previewDecimal(n) {
-                const sample = 123456;
-                const divisor = Math.pow(10, n);
-                return (sample / divisor).toFixed(n);
-            },
+          previewDecimal(n) {
+              const sample = 123456;
+              const divisor = Math.pow(10, n);
+              return (sample / divisor).toFixed(n);
+          },
 
-            previewFavicon(event) {
-                const file = event.target.files[0];
-                if (file) {
-                    this.faviconFile = file;
-                    this.faviconPreview = URL.createObjectURL(file);
-                }
-            },
+          previewFavicon(event) {
+              const file = event.target.files[0];
+              if (file) {
+                  this.faviconFile = file;
+                  this.faviconPreview = URL.createObjectURL(file);
+              }
+          },
 
-            async uploadFavicon() {
-                if (!this.faviconFile) return;
-                this.isSubmitting = true;
-                try {
-                    const formData = new FormData();
-                    formData.append('favicon', this.faviconFile);
+          async uploadFavicon() {
+              if (!this.faviconFile) return;
+              this.isSubmitting = true;
+              try {
+                  const formData = new FormData();
+                  formData.append('favicon', this.faviconFile);
 
-                    const res = await fetch('/settings/favicon', {
-                        method: 'POST',
-                        body: formData
-                    });
-                    const data = await res.json();
-                    if (data.status) {
-                        this.currentFavicon = data.favicon_url;
-                        this.faviconFile = null;
-                        this.faviconPreview = null;
-                        // Update favicon in browser tab immediately
-                        const link = document.querySelector('link[rel="icon"]');
-                        if (link) link.href = data.favicon_url;
-                        Swal.fire({ icon: 'success', title: 'Saved!', text: data.message, timer: 1500, showConfirmButton: false });
-                    } else {
-                        Swal.fire({ icon: 'error', title: 'Error', text: data.message });
-                    }
-                } catch (e) {
-                    Swal.fire({ icon: 'error', title: 'Error', text: 'Something went wrong' });
-                } finally {
-                    this.isSubmitting = false;
-                }
-            },
+                  const res = await fetch('/settings/favicon', {
+                      method: 'POST',
+                      body: formData
+                  });
+                  const data = await res.json();
+                  if (data.status) {
+                      this.currentFavicon = data.favicon_url;
+                      this.faviconFile = null;
+                      this.faviconPreview = null;
+                      // Update favicon in browser tab immediately
+                      const link = document.querySelector('link[rel="icon"]');
+                      if (link) link.href = data.favicon_url;
+                      Swal.fire({ icon: 'success', title: 'Saved!', text: data.message, timer: 1500, showConfirmButton: false });
+                  } else {
+                      Swal.fire({ icon: 'error', title: 'Error', text: data.message });
+                  }
+              } catch (e) {
+                  Swal.fire({ icon: 'error', title: 'Error', text: 'Something went wrong' });
+              } finally {
+                  this.isSubmitting = false;
+              }
+          },
 
-            async saveSetting(name, value) {
-                this.isSubmitting = true;
-                try {
-                    const formData = new URLSearchParams();
-                    formData.append('setting_name', name);
-                    formData.append('setting_value', value.toString());
+          async saveSetting(name, value) {
+              this.isSubmitting = true;
+              try {
+                  const formData = new URLSearchParams();
+                  formData.append('setting_name', name);
+                  formData.append('setting_value', value.toString());
 
-                    const res = await fetch('/settings', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body: formData
-                    });
-                    const data = await res.json();
-                    if (data.status) {
-                        Swal.fire({ icon: 'success', title: 'Saved!', text: data.message, timer: 1500, showConfirmButton: false });
-                    } else {
-                        Swal.fire({ icon: 'error', title: 'Error', text: data.message });
-                    }
-                } catch (e) {
-                    Swal.fire({ icon: 'error', title: 'Error', text: 'Something went wrong' });
-                } finally {
-                    this.isSubmitting = false;
-                }
-            }
-        }))
-    })
+                  const res = await fetch('/settings', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                      body: formData
+                  });
+                  const data = await res.json();
+                  if (data.status) {
+                      Swal.fire({ icon: 'success', title: 'Saved!', text: data.message, timer: 1500, showConfirmButton: false });
+                  } else {
+                      Swal.fire({ icon: 'error', title: 'Error', text: data.message });
+                  }
+              } catch (e) {
+                  Swal.fire({ icon: 'error', title: 'Error', text: 'Something went wrong' });
+              } finally {
+                  this.isSubmitting = false;
+              }
+          }
+      }))
+  })
 </script>
 
-{{ template "footer.html" . }}
-{{ end }}
+{{ template "footer.html" . }} {{ end }}

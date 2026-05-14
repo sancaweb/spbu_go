@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"spbu_go/internal/service"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -43,6 +44,22 @@ func (h *SettingHandler) Index(c *gin.Context) {
 	})
 }
 
+func (h *SettingHandler) GetValue(c *gin.Context) {
+	name := c.Param("name")
+	if name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"status": false, "message": "Setting name is required"})
+		return
+	}
+
+	value, err := h.settingService.Get(name)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"status": true, "name": name, "value": ""})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": true, "name": name, "value": value})
+}
+
 func (h *SettingHandler) Update(c *gin.Context) {
 	name := c.PostForm("setting_name")
 	value := c.PostForm("setting_value")
@@ -50,6 +67,14 @@ func (h *SettingHandler) Update(c *gin.Context) {
 	if name == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"status": false, "message": "Setting name is required"})
 		return
+	}
+
+	if name == "penebusan_tax_multiplier" {
+		value = strings.TrimSpace(value)
+		if strings.Contains(value, ",") {
+			value = strings.ReplaceAll(value, ".", "")
+			value = strings.Replace(value, ",", ".", 1)
+		}
 	}
 
 	if err := h.settingService.Set(name, value); err != nil {

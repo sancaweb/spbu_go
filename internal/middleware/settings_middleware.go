@@ -11,7 +11,7 @@ func SettingsMiddleware(settingService service.SettingService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		favicon, _ := settingService.Get("favicon")
 		if favicon == "" {
-			favicon = "/static/favicon.png"
+			favicon = "/static/favicon.ico"
 		}
 		c.Set("favicon", favicon)
 

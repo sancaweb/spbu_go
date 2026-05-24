@@ -161,11 +161,17 @@ func Seed() {
 		}
 	}
 
+	// --- Shift Seeder ---
+	seedShifts()
+
 	// --- Penebusan Seeder --- (must be called after BBM seeding)
 	seedPenebusan()
 
 	// --- Employee & Jabatan Seeder ---
 	seedEmployees()
+
+	// --- Kedatangan BBM Seeder --- (must run after penebusan + shift seeding)
+	seedKedatanganBBM()
 
 	log.Println("Database seeded successfully")
 }
@@ -475,6 +481,143 @@ func seedEmployees() {
 		}
 	}
 	log.Println("COA Mapping defaults seeded successfully")
+
+	// ─── Seed BBM-specific penebusan/debit_adm_bank mappings ─────────────────
+	// Maps each seeded BBM to its pre-seeded 511X "Biaya Admin Bank Penebusan" COA account.
+	// Bio Solar, DEX, Pertalite Khusus do not have 511X accounts seeded — users should
+	// run "Generate COA" per BBM to create them.
+	type bbmAdmItem struct {
+		BBMName string
+		COACode string
+		Label   string
+	}
+	bbmAdmItems := []bbmAdmItem{
+		{"Pertalite", "5111", "Biaya Admin Bank Penebusan \u2014 Pertalite"},
+		{"Pertamax", "5112", "Biaya Admin Bank Penebusan \u2014 Pertamax"},
+		{"Pertamax Turbo", "5113", "Biaya Admin Bank Penebusan \u2014 Pertamax Turbo"},
+		{"DEX", "5114", "Biaya Admin Bank Penebusan \u2014 Pertamina Dex"},
+		{"Dexlite", "5115", "Biaya Admin Bank Penebusan \u2014 Dexlite"},
+	}
+	for _, item := range bbmAdmItems {
+		var bbm entity.BBM
+		if err := db.Where("name = ?", item.BBMName).First(&bbm).Error; err != nil {
+			continue
+		}
+		var coa entity.COA
+		if err := db.Where("code = ?", item.COACode).First(&coa).Error; err != nil {
+			continue
+		}
+		bbmID := bbm.ID
+		var existing entity.COAMapping
+		db.Where("trans_type = ? AND role = ? AND bbm_id = ?", "penebusan", "debit_adm_bank", bbmID).
+			Limit(1).Find(&existing)
+		if existing.ID == 0 {
+			db.Omit("COA", "BBM").Create(&entity.COAMapping{
+				TransType: "penebusan",
+				Role:      "debit_adm_bank",
+				Label:     item.Label,
+				COAID:     coa.ID,
+				BBMID:     &bbmID,
+			})
+		}
+	}
+	log.Println("BBM-specific penebusan/debit_adm_bank mappings seeded successfully")
+}
+
+// seedShifts — seed 3 shift kerja default.
+func seedShifts() {
+	db := database.DB
+	shifts := []entity.Shift{
+		{ShiftName: "Shift 1", ShiftTime: "07:00 - 15:00"},
+		{ShiftName: "Shift 2", ShiftTime: "15:00 - 23:00"},
+		{ShiftName: "Shift 3", ShiftTime: "23:00 - 07:00"},
+	}
+	for i := range shifts {
+		db.Where(entity.Shift{ShiftName: shifts[i].ShiftName}).FirstOrCreate(&shifts[i])
+	}
+	log.Println("Shift data seeded successfully")
+}
+
+// seedKedatanganBBM — seed sample kedatangan BBM dari penebusan CO yang ada.
+// Idempotent: skip jika sudah ada data.
+func seedKedatanganBBM() {
+	db := database.DB
+
+	var count int64
+	db.Model(&entity.TrxKedatanganBBM{}).Count(&count)
+	if count > 0 {
+		log.Printf("Kedatangan BBM sudah ada %d rows, skip seeding", count)
+		return
+	}
+
+	// Ambil shift
+	var shifts []entity.Shift
+	db.Order("id ASC").Find(&shifts)
+	if len(shifts) == 0 {
+		log.Println("Kedatangan seeder: tidak ada shift, skip")
+		return
+	}
+
+	// Ambil penebusan CO yang punya no_so, beserta detailnya
+	var penebusanList []entity.TrxPenebusan
+	db.Where("status = 'CO' AND no_so IS NOT NULL AND no_so != ''").
+		Preload("Details").
+		Preload("Details.BBM").
+		Order("tgl_penebusan ASC").
+		Limit(20).
+		Find(&penebusanList)
+
+	if len(penebusanList) == 0 {
+		log.Println("Kedatangan seeder: tidak ada penebusan CO, skip")
+		return
+	}
+
+	drivers := []string{"Supriyanto", "Budi Santosa", "Eko Prasetyo", "Hendra Jaya", "Dedy Kurniawan"}
+	noPols := []string{"B 9234 XY", "D 4521 AB", "F 8832 CD", "B 1123 ZZ", "D 6670 EF"}
+
+	seeded := 0
+	for i, p := range penebusanList {
+		for j, detail := range p.Details {
+			// Seed sebagian liter (70-90% dari total, simulasikan partial delivery)
+			pct := int64(70 + (i+j)%21) // 70..90
+			jmlLiter := detail.JmlLiter * pct / 100
+			if jmlLiter <= 0 {
+				continue
+			}
+
+			shift := shifts[(i+j)%len(shifts)]
+			noLO := fmt.Sprintf("LO/%04d/%02d/%03d",
+				p.TglPenebusan.Year(), int(p.TglPenebusan.Month()), i*10+j+1)
+
+			tglKedatangan := p.TglPenebusan.AddDate(0, 0, 1+j)
+
+			k := entity.TrxKedatanganBBM{
+				PenebusanID:       uint64(p.ID),
+				PenebusanDetailID: uint64(detail.ID),
+				NoLO:              noLO,
+				TglKedatangan:     tglKedatangan,
+				ShiftID:           shift.ID,
+				BBMID:             detail.BBMID,
+				JmlLiter:          jmlLiter,
+				NamaDriver:        drivers[(i+j)%len(drivers)],
+				NoPol:             noPols[(i+j)%len(noPols)],
+			}
+
+			if err := db.Omit("Penebusan", "PenebusanDetail", "Shift", "BBM", "Creator", "Updater").
+				Create(&k).Error; err != nil {
+				log.Printf("Failed to seed kedatangan LO=%s: %v", noLO, err)
+				continue
+			}
+
+			// Update qty_terkirim pada penebusan_detail
+			db.Model(&entity.TrxPenebusanDetail{}).
+				Where("id = ?", detail.ID).
+				Update("qty_terkirim", jmlLiter)
+
+			seeded++
+		}
+	}
+	log.Printf("Seeded %d kedatangan BBM records", seeded)
 }
 
 // seedPenebusan — dedicated seeder for sample penebusan data.

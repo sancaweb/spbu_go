@@ -383,6 +383,7 @@
 
   function penebusanDetail() {
     return {
+      collapsed: false,
       selectedId: null,
       selectedHeader: null,
       currentDetails: [],
@@ -477,13 +478,49 @@
   <!-- â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•— -->
   <!-- â•‘  CARD 1 â€” Daftar Header Penebusan (DataTables)  â•‘ -->
   <!-- â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-  <div class="glass-card rounded-2xl overflow-hidden">
-    <div class="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
-      <div
-        class="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center"
+  <div
+    class="glass-card rounded-2xl overflow-hidden"
+    x-data="{ collapsed: false }"
+  >
+    <div
+      class="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-3"
+    >
+      <div class="flex items-center gap-3">
+        <div
+          class="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center"
+        >
+          <svg
+            class="w-5 h-5 text-[#005596]"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+            />
+          </svg>
+        </div>
+        <div>
+          <h3 class="text-base font-semibold text-slate-800">
+            Daftar Penebusan
+          </h3>
+          <p class="text-xs text-slate-400">
+            Klik baris untuk melihat detail transaksi
+          </p>
+        </div>
+      </div>
+      <button
+        type="button"
+        @click="collapsed = !collapsed; if (!collapsed && window._penebusanTable) { setTimeout(() => window._penebusanTable.columns.adjust().draw(false), 80); }"
+        class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50"
       >
+        <span x-text="collapsed ? 'Buka' : 'Gulung'"></span>
         <svg
-          class="w-5 h-5 text-[#005596]"
+          class="w-4 h-4 transition-transform duration-200"
+          :class="collapsed ? '-rotate-90' : 'rotate-0'"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -492,18 +529,12 @@
             stroke-linecap="round"
             stroke-linejoin="round"
             stroke-width="2"
-            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+            d="M19 9l-7 7-7-7"
           />
         </svg>
-      </div>
-      <div>
-        <h3 class="text-base font-semibold text-slate-800">Daftar Penebusan</h3>
-        <p class="text-xs text-slate-400">
-          Klik baris untuk melihat detail transaksi
-        </p>
-      </div>
+      </button>
     </div>
-    <div class="p-4">
+    <div class="p-4" x-show="!collapsed" x-transition>
       <table id="penebusanTable" class="w-full text-sm" style="width: 100%">
         <thead>
           <tr
@@ -562,10 +593,10 @@
           <template x-if="selectedId">
             <p class="text-xs text-slate-400">
               <span x-text="selectedHeader?.no_penebusan"></span>
-              &nbsp;Â·&nbsp;
+              &nbsp;&middot;&nbsp;
               <span x-text="formatDate(selectedHeader?.tgl_penebusan)"></span>
               <template x-if="selectedHeader?.wallet_name">
-                &nbsp;Â·&nbsp;<span
+                &nbsp;&middot;&nbsp;<span
                   x-text="'Via ' + selectedHeader?.wallet_name"
                 ></span>
               </template>
@@ -577,412 +608,341 @@
         </div>
       </div>
 
-      <!-- Summary chips â€” hanya muncul saat ada selection dan tidak loading -->
-      <template x-if="selectedId && !loadingDetail">
-        <div class="flex items-center gap-3 text-xs flex-wrap justify-end">
-          <div
-            class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5"
-          >
-            <span class="text-slate-500">Subtotal</span>
-            <span
-              class="font-semibold text-slate-700"
-              x-text="'Rp ' + formatRp(selectedHeader?.subtotal)"
-            ></span>
+      <!-- Summary chips + collapse button — right side of card header -->
+      <div class="flex items-center gap-3 flex-wrap justify-end">
+        <!-- Chips: only when selected, loaded, not collapsed -->
+        <template x-if="selectedId && !loadingDetail && !collapsed">
+          <div class="flex items-center gap-2 text-xs flex-wrap">
+            <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
+              <span class="text-slate-500">Subtotal</span>
+              <span class="font-semibold text-slate-700" x-text="'Rp ' + formatRp(selectedHeader?.subtotal)"></span>
+            </div>
+            <div class="flex items-center gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
+              <span class="text-amber-600">PPN</span>
+              <span class="font-semibold text-amber-700" x-text="'Rp ' + formatRp(selectedHeader?.total_ppn)"></span>
+            </div>
+            <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
+              <span class="text-slate-500">Adm Bank</span>
+              <span class="font-semibold text-slate-700" x-text="'Rp ' + formatRp(selectedHeader?.adm_bank)"></span>
+            </div>
+            <div class="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5">
+              <span class="text-[#005596]">Total Bayar</span>
+              <span class="font-bold text-[#005596]" x-text="'Rp ' + formatRp(selectedHeader?.total_bayar)"></span>
+            </div>
           </div>
-          <div
-            class="flex items-center gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5"
-          >
-            <span class="text-amber-600">PPN</span>
-            <span
-              class="font-semibold text-amber-700"
-              x-text="'Rp ' + formatRp(selectedHeader?.total_ppn)"
-            ></span>
+        </template>
+        <!-- Collapse button — always visible -->
+        <button
+          type="button"
+          @click="collapsed = !collapsed"
+          class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50"
+        >
+          <span x-text="collapsed ? 'Buka' : 'Gulung'"></span>
+          <svg class="w-4 h-4 transition-transform duration-200" :class="collapsed ? '-rotate-90' : 'rotate-0'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </button>
+      </div>
+    </div><!-- /card header -->
+
+    <!-- Card Body: visible by default, only toggled by collapsed — no x-cloak -->
+    <div x-show="!collapsed" x-transition>
+
+      <!-- Loading skeleton -->
+      <template x-if="loadingDetail">
+        <div class="px-6 py-8 space-y-3 animate-pulse">
+          <div class="flex items-center gap-3 mb-6">
+            <div class="w-10 h-10 rounded-xl bg-slate-200"></div>
+            <div class="space-y-2 flex-1">
+              <div class="h-3 bg-slate-200 rounded w-1/3"></div>
+              <div class="h-2.5 bg-slate-100 rounded w-1/4"></div>
+            </div>
+            <div class="flex gap-2">
+              <div class="h-7 w-24 bg-slate-100 rounded-lg"></div>
+              <div class="h-7 w-24 bg-blue-100 rounded-lg"></div>
+            </div>
           </div>
-          <div
-            class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5"
-          >
-            <span class="text-slate-500">Adm Bank</span>
-            <span
-              class="font-semibold text-slate-700"
-              x-text="'Rp ' + formatRp(selectedHeader?.adm_bank)"
-            ></span>
+          <div class="space-y-2">
+            <div class="h-9 bg-slate-100 rounded-lg w-full"></div>
+            <div class="h-12 bg-slate-50 rounded-lg w-full"></div>
+            <div class="h-12 bg-slate-50 rounded-lg w-full opacity-80"></div>
+            <div class="h-12 bg-slate-50 rounded-lg w-full opacity-60"></div>
           </div>
-          <div
-            class="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5"
-          >
-            <span class="text-[#005596]">Total Bayar</span>
-            <span
-              class="font-bold text-[#005596]"
-              x-text="'Rp ' + formatRp(selectedHeader?.total_bayar)"
-            ></span>
+          <div class="flex justify-center pt-4">
+            <svg class="animate-spin h-6 w-6 text-[#005596]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            <span class="ml-2 text-sm text-slate-400">Memuat detail...</span>
           </div>
         </div>
       </template>
-    </div>
 
-    <!-- Loading skeleton â€” tampil saat loadingDetail = true -->
-    <template x-if="loadingDetail">
-      <div class="px-6 py-8 space-y-3 animate-pulse">
-        <div class="flex items-center gap-3 mb-6">
-          <div class="w-10 h-10 rounded-xl bg-slate-200"></div>
-          <div class="space-y-2 flex-1">
-            <div class="h-3 bg-slate-200 rounded w-1/3"></div>
-            <div class="h-2.5 bg-slate-100 rounded w-1/4"></div>
+      <!-- Empty state -->
+      <template x-if="!selectedId && !loadingDetail">
+        <div class="flex flex-col items-center justify-center py-20 text-slate-400 gap-4">
+          <div class="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center">
+            <svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/>
+            </svg>
           </div>
-          <div class="flex gap-2">
-            <div class="h-7 w-24 bg-slate-100 rounded-lg"></div>
-            <div class="h-7 w-24 bg-blue-100 rounded-lg"></div>
+          <div class="text-center">
+            <p class="font-medium text-slate-500">Silahkan pilih transaksi</p>
+            <p class="text-sm text-slate-400 mt-1">untuk melihat detail Penebusan</p>
           </div>
         </div>
-        <div class="space-y-2">
-          <div class="h-9 bg-slate-100 rounded-lg w-full"></div>
-          <div class="h-12 bg-slate-50 rounded-lg w-full"></div>
-          <div class="h-12 bg-slate-50 rounded-lg w-full opacity-80"></div>
-          <div class="h-12 bg-slate-50 rounded-lg w-full opacity-60"></div>
-        </div>
-        <div class="flex justify-center pt-4">
-          <svg
-            class="animate-spin h-6 w-6 text-[#005596]"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              class="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              stroke-width="4"
-            ></circle>
-            <path
-              class="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-            ></path>
-          </svg>
-          <span class="ml-2 text-sm text-slate-400">Memuat detail...</span>
-        </div>
-      </div>
-    </template>
+      </template>
 
-    <!-- Empty state â€” belum pilih -->
-    <template x-if="!selectedId && !loadingDetail">
-      <div
-        class="flex flex-col items-center justify-center py-20 text-slate-400 gap-4"
-      >
-        <div
-          class="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center"
-        >
-          <svg
-            class="w-8 h-8 text-slate-300"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="1.5"
-              d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"
-            />
-          </svg>
-        </div>
-        <div class="text-center">
-          <p class="font-medium text-slate-500">Silahkan pilih transaksi</p>
-          <p class="text-sm text-slate-400 mt-1">
-            untuk melihat detail Penebusan
-          </p>
-        </div>
-      </div>
-    </template>
-
-    <!-- Detail Table -->
-    <template x-if="selectedId && !loadingDetail">
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead>
-            <tr
-              class="bg-slate-50/80 text-slate-500 uppercase text-xs tracking-wider"
-            >
-              <th class="px-5 py-3 text-center w-10">#</th>
-              <th class="px-5 py-3 text-left">Jenis BBM</th>
-              <th class="px-5 py-3 text-right">Jml Liter</th>
-              <th class="px-5 py-3 text-right">Harga / Liter</th>
-              <th class="px-5 py-3 text-right">Subtotal</th>
-              <th class="px-5 py-3 text-right">PPN</th>
-              <th class="px-5 py-3 text-right">Total</th>
-              <th class="px-5 py-3 text-center">Action</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-100">
-            <template x-if="currentDetails.length === 0">
-              <tr>
-                <td
-                  colspan="8"
-                  class="px-5 py-10 text-center text-slate-400 text-sm"
-                >
-                  Tidak ada detail untuk transaksi ini.
-                </td>
+      <!-- Detail Table -->
+      <template x-if="selectedId && !loadingDetail">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-slate-50/80 text-slate-500 uppercase text-xs tracking-wider">
+                <th class="px-5 py-3 text-center w-10">#</th>
+                <th class="px-5 py-3 text-left">Jenis BBM</th>
+                <th class="px-5 py-3 text-right">Jml Liter</th>
+                <th class="px-5 py-3 text-right">Harga / Liter</th>
+                <th class="px-5 py-3 text-right">Subtotal</th>
+                <th class="px-5 py-3 text-right">PPN</th>
+                <th class="px-5 py-3 text-right">Total</th>
               </tr>
-            </template>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <template x-if="currentDetails.length === 0">
+                <tr>
+                  <td colspan="7" class="px-5 py-10 text-center text-slate-400 text-sm">
+                    Tidak ada detail untuk transaksi ini.
+                  </td>
+                </tr>
+              </template>
+              <template x-for="(d, idx) in currentDetails" :key="d.id">
+                <tr class="hover:bg-slate-50 transition-colors">
+                  <td class="px-5 py-3.5 text-center text-slate-500" x-text="idx + 1"></td>
+                  <td class="px-5 py-3.5">
+                    <div class="flex items-center gap-2">
+                      <div class="w-2 h-2 rounded-full bg-[#509E2F]"></div>
+                      <span class="font-medium text-slate-700" x-text="d.bbm_name"></span>
+                    </div>
+                  </td>
+                  <td class="px-5 py-3.5 text-right text-slate-600" x-text="formatStock(d.jml_liter) + ' L'"></td>
+                  <td class="px-5 py-3.5 text-right">
+                    <div class="text-slate-700" x-text="'Rp ' + formatRp(d.harga_dasar)"></div>
+                    <div class="text-xs text-slate-400" x-text="'Jual: Rp ' + formatRp(d.harga_jual)"></div>
+                  </td>
+                  <td class="px-5 py-3.5 text-right text-slate-700" x-text="'Rp ' + formatRp(d.subtotal)"></td>
+                  <td class="px-5 py-3.5 text-right">
+                    <div class="text-amber-600 font-medium" x-text="'Rp ' + formatRp(d.ppn_rp)"></div>
+                    <div class="text-xs text-slate-400" x-text="d.ppn_persen + '%'"></div>
+                  </td>
+                  <td class="px-5 py-3.5 text-right font-semibold text-slate-800" x-text="'Rp ' + formatRp(d.total)"></td>
+                </tr>
+              </template>
+              <!-- Grand Total row -->
+              <template x-if="currentDetails.length > 0">
+                <tr class="bg-slate-50/80 font-semibold text-slate-700 border-t-2 border-slate-200">
+                  <td colspan="4" class="px-5 py-3 text-right text-slate-500 text-xs uppercase tracking-wider">Grand Total</td>
+                  <td class="px-5 py-3 text-right" x-text="'Rp ' + formatRp(selectedHeader?.subtotal)"></td>
+                  <td class="px-5 py-3 text-right text-amber-600" x-text="'Rp ' + formatRp(selectedHeader?.total_ppn)"></td>
+                  <td class="px-5 py-3 text-right text-[#005596]" x-text="'Rp ' + formatRp(selectedHeader?.total_bayar)"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </template>
 
-            <template x-for="(d, idx) in currentDetails" :key="d.id">
-              <tr class="hover:bg-slate-50 transition-colors">
-                <td
-                  class="px-5 py-3.5 text-center text-slate-500"
-                  x-text="idx + 1"
-                ></td>
-                <td class="px-5 py-3.5">
-                  <div class="flex items-center gap-2">
-                    <div class="w-2 h-2 rounded-full bg-[#509E2F]"></div>
-                    <span
-                      class="font-medium text-slate-700"
-                      x-text="d.bbm_name"
-                    ></span>
-                  </div>
-                </td>
-                <td
-                  class="px-5 py-3.5 text-right text-slate-600"
-                  x-text="formatStock(d.jml_liter) + ' L'"
-                ></td>
-                <td class="px-5 py-3.5 text-right">
-                  <div
-                    class="text-slate-700"
-                    x-text="'Rp ' + formatRp(d.harga_dasar)"
-                  ></div>
-                  <div
-                    class="text-xs text-slate-400"
-                    x-text="'Jual: Rp ' + formatRp(d.harga_jual)"
-                  ></div>
-                </td>
-                <td
-                  class="px-5 py-3.5 text-right text-slate-700"
-                  x-text="'Rp ' + formatRp(d.subtotal)"
-                ></td>
-                <td class="px-5 py-3.5 text-right">
-                  <div
-                    class="text-amber-600 font-medium"
-                    x-text="'Rp ' + formatRp(d.ppn_rp)"
-                  ></div>
-                  <div
-                    class="text-xs text-slate-400"
-                    x-text="d.ppn_persen + '%'"
-                  ></div>
-                </td>
-                <td
-                  class="px-5 py-3.5 text-right font-semibold text-slate-800"
-                  x-text="'Rp ' + formatRp(d.total)"
-                ></td>
-                <td class="px-5 py-3.5 text-center">
-                  <button
-                    class="w-8 h-8 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-600 flex items-center justify-center transition-colors mx-auto"
-                    title="Edit Item"
-                  >
-                    <svg
-                      class="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                      />
-                    </svg>
-                  </button>
-                </td>
-              </tr>
-            </template>
+    </div><!-- /card body -->
+  </div><!-- /CARD 2 -->
 
-            <!-- Grand Total row -->
-            <template x-if="currentDetails.length > 0">
-              <tr
-                class="bg-slate-50/80 font-semibold text-slate-700 border-t-2 border-slate-200"
-              >
-                <td
-                  colspan="4"
-                  class="px-5 py-3 text-right text-slate-500 text-xs uppercase tracking-wider"
-                >
-                  Grand Total
-                </td>
-                <td
-                  class="px-5 py-3 text-right"
-                  x-text="'Rp ' + formatRp(selectedHeader?.subtotal)"
-                ></td>
-                <td
-                  class="px-5 py-3 text-right text-amber-600"
-                  x-text="'Rp ' + formatRp(selectedHeader?.total_ppn)"
-                ></td>
-                <td
-                  class="px-5 py-3 text-right text-[#005596]"
-                  x-text="'Rp ' + formatRp(selectedHeader?.total_bayar)"
-                ></td>
-                <td></td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
-    </template>
-  </div>
-
-  <!-- DataTables CSS & JS  -->
-  <link
-    rel="stylesheet"
-    type="text/css"
-    href="/static/vendor/jquery.dataTables.min.css"
-  />
+  <!-- jQuery + DataTables — must be loaded before the init script below -->
+  <link rel="stylesheet" href="/static/vendor/jquery.dataTables.min.css">
   <script src="/static/vendor/jquery-3.7.1.min.js"></script>
   <script src="/static/vendor/jquery.dataTables.min.js"></script>
 
-  <style>
-    /* Override DataTables to blend with existing Tailwind design */
-    .dataTables_wrapper .dataTables_length select,
-    .dataTables_wrapper .dataTables_filter input {
-      border: 1px solid #cbd5e1;
-      border-radius: 0.5rem;
-      padding: 0.25rem 0.5rem;
-      outline: none;
-      font-size: 0.875rem;
-    }
-    .dataTables_wrapper .dataTables_filter input:focus,
-    .dataTables_wrapper .dataTables_length select:focus {
-      border-color: #005596;
-      box-shadow: 0 0 0 2px rgba(0, 85, 150, 0.15);
-    }
-    .dataTables_wrapper .dataTables_info {
-      font-size: 0.8rem;
-      color: #94a3b8;
-      padding-top: 0.75rem;
-    }
-    .dataTables_wrapper .dataTables_paginate .paginate_button.current,
-    .dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
-      background: #005596 !important;
-      color: white !important;
-      border: none;
-      border-radius: 0.5rem;
-    }
-    .dataTables_wrapper .dataTables_paginate .paginate_button {
-      border-radius: 0.5rem;
-      border: none !important;
-    }
-    .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
-      background: #f1f5f9 !important;
-      color: #1e293b !important;
-      border: none !important;
-    }
-    .dataTables_wrapper .dataTables_processing {
-      background: rgba(255, 255, 255, 0.9);
-      border: 1px solid #e2e8f0;
-      border-radius: 0.75rem;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-      color: #005596;
-      font-size: 0.875rem;
-    }
-    /* Selected row highlight */
-    #penebusanTable tbody tr.dt-selected {
-      background-color: rgba(239, 246, 255, 0.8) !important;
-      border-left: 4px solid #005596;
-    }
-    #penebusanTable tbody tr {
-      cursor: pointer;
-      transition: background-color 0.15s ease;
-    }
-    #penebusanTable tbody tr:hover:not(.dt-selected) {
-      background-color: rgba(248, 250, 252, 0.8);
-    }
-  </style>
+              <style>
+                /* Override DataTables to blend with existing Tailwind design */
+                .dataTables_wrapper .dataTables_length select,
+                .dataTables_wrapper .dataTables_filter input {
+                  border: 1px solid #cbd5e1;
+                  border-radius: 0.5rem;
+                  padding: 0.25rem 0.5rem;
+                  outline: none;
+                  font-size: 0.875rem;
+                }
+                .dataTables_wrapper .dataTables_filter input:focus,
+                .dataTables_wrapper .dataTables_length select:focus {
+                  border-color: #005596;
+                  box-shadow: 0 0 0 2px rgba(0, 85, 150, 0.15);
+                }
+                .dataTables_wrapper .dataTables_info {
+                  font-size: 0.8rem;
+                  color: #94a3b8;
+                  padding-top: 0.75rem;
+                }
+                .dataTables_wrapper
+                  .dataTables_paginate
+                  .paginate_button.current,
+                .dataTables_wrapper
+                  .dataTables_paginate
+                  .paginate_button.current:hover {
+                  background: #005596 !important;
+                  color: white !important;
+                  border: none;
+                  border-radius: 0.5rem;
+                }
+                .dataTables_wrapper .dataTables_paginate .paginate_button {
+                  border-radius: 0.5rem;
+                  border: none !important;
+                }
+                .dataTables_wrapper
+                  .dataTables_paginate
+                  .paginate_button:hover {
+                  background: #f1f5f9 !important;
+                  color: #1e293b !important;
+                  border: none !important;
+                }
+                .dataTables_wrapper .dataTables_processing {
+                  background: rgba(255, 255, 255, 0.9);
+                  border: 1px solid #e2e8f0;
+                  border-radius: 0.75rem;
+                  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+                  color: #005596;
+                  font-size: 0.875rem;
+                }
+                /* Table grid lines */
+                #penebusanTable {
+                  border-collapse: collapse;
+                }
+                #penebusanTable thead tr {
+                  border-bottom: 2px solid #e2e8f0;
+                }
+                #penebusanTable thead th {
+                  border-right: 1px solid #e2e8f0;
+                  padding-top: 10px;
+                  padding-bottom: 10px;
+                }
+                #penebusanTable thead th:last-child { border-right: none; }
+                #penebusanTable tbody td {
+                  border-right: 1px solid #f1f5f9;
+                  border-bottom: 1px solid #f1f5f9;
+                }
+                #penebusanTable tbody td:last-child { border-right: none; }
+                #penebusanTable tbody tr:last-child td { border-bottom: none; }
+                /* Selected row highlight */
+                #penebusanTable tbody tr.dt-selected {
+                  background-color: rgba(239, 246, 255, 0.8) !important;
+                  border-left: 4px solid #005596;
+                }
+                #penebusanTable tbody tr {
+                  cursor: pointer;
+                  transition: background-color 0.15s ease;
+                }
+                #penebusanTable tbody tr:hover:not(.dt-selected) {
+                  background-color: rgba(248, 250, 252, 0.8);
+                }
+              </style>
 
-  <script>
-    // â”€â”€ Global state for selected row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    let _selectedPenebusanId = null;
-    let _penebusanTable = null;
+              <script>
+                // â”€â”€ Global state for selected row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                let _selectedPenebusanId = null;
+                let _penebusanTable = null;
 
-    // â”€â”€ Helper formatters (used in DataTables render) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    function _fmtDate(str) {
-      if (!str) return "â€”";
-      const d = new Date(str + "T00:00:00");
-      return d.toLocaleDateString("id-ID", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      });
-    }
-    function _fmtRp(val) {
-      return Number(val || 0).toLocaleString("id-ID");
-    }
-    function _statusBadge(s) {
-      const map = {
-        DR: ["bg-slate-100 text-slate-600", "Draft"],
-        CO: ["bg-green-100 text-green-700", "Complete"],
-        // backward compatibility display for legacy rows
-        draft: ["bg-slate-100 text-slate-600", "Draft"],
-        paid: ["bg-green-100 text-green-700", "Complete"],
-        partial_delivered: ["bg-green-100 text-green-700", "Complete"],
-        delivered: ["bg-green-100 text-green-700", "Complete"],
-        cancelled: ["bg-slate-100 text-slate-600", "Draft"],
-      };
-      const [cls, label] = map[s] || ["bg-slate-100 text-slate-600", s];
-      return `<span class="px-2.5 py-1 rounded-full text-xs font-semibold ${cls}">${label}</span>`;
-    }
+                // â”€â”€ Helper formatters (used in DataTables render) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                function _fmtDate(str) {
+                  if (!str) return "â€”";
+                  const d = new Date(str + "T00:00:00");
+                  return d.toLocaleDateString("id-ID", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  });
+                }
+                function _fmtRp(val) {
+                  return Number(val || 0).toLocaleString("id-ID");
+                }
+                function _statusBadge(s) {
+                  const map = {
+                    DR: ["bg-slate-100 text-slate-600", "Draft"],
+                    CO: ["bg-green-100 text-green-700", "Complete"],
+                    // backward compatibility display for legacy rows
+                    draft: ["bg-slate-100 text-slate-600", "Draft"],
+                    paid: ["bg-green-100 text-green-700", "Complete"],
+                    partial_delivered: [
+                      "bg-green-100 text-green-700",
+                      "Complete",
+                    ],
+                    delivered: ["bg-green-100 text-green-700", "Complete"],
+                    cancelled: ["bg-slate-100 text-slate-600", "Draft"],
+                  };
+                  const [cls, label] = map[s] || [
+                    "bg-slate-100 text-slate-600",
+                    s,
+                  ];
+                  return `<span class="px-2.5 py-1 rounded-full text-xs font-semibold ${cls}">${label}</span>`;
+                }
 
-    function _escapeHtml(str) {
-      return String(str || "")
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#39;");
-    }
+                function _escapeHtml(str) {
+                  return String(str || "")
+                    .replaceAll("&", "&amp;")
+                    .replaceAll("<", "&lt;")
+                    .replaceAll(">", "&gt;")
+                    .replaceAll('"', "&quot;")
+                    .replaceAll("'", "&#39;");
+                }
 
-    function _getPenebusanPageVM() {
-      const root = document.querySelector("[data-penebusan-root]");
-      if (!root) return null;
-      if (root.__x && root.__x.$data) return root.__x.$data;
-      if (root._x_dataStack && root._x_dataStack.length) {
-        return root._x_dataStack[0];
-      }
-      if (window.Alpine && typeof window.Alpine.$data === "function") {
-        try {
-          return window.Alpine.$data(root);
-        } catch (_) {}
-      }
-      return null;
-    }
+                function _getPenebusanPageVM() {
+                  const root = document.querySelector("[data-penebusan-root]");
+                  if (!root) return null;
+                  if (root.__x && root.__x.$data) return root.__x.$data;
+                  if (root._x_dataStack && root._x_dataStack.length) {
+                    return root._x_dataStack[0];
+                  }
+                  if (
+                    window.Alpine &&
+                    typeof window.Alpine.$data === "function"
+                  ) {
+                    try {
+                      return window.Alpine.$data(root);
+                    } catch (_) {}
+                  }
+                  return null;
+                }
 
-    async function _editPenebusan(id) {
-      try {
-        const vm = _getPenebusanPageVM();
-        if (!vm || typeof vm.openEditModal !== "function") {
-          throw new Error("Form edit tidak tersedia");
-        }
-        await vm.openEditModal(id);
-      } catch (e) {
-        Swal.fire({
-          icon: "error",
-          title: "Error",
-          text: e.message || "Gagal membuka form edit",
-        });
-      }
-    }
+                async function _editPenebusan(id) {
+                  try {
+                    const vm = _getPenebusanPageVM();
+                    if (!vm || typeof vm.openEditModal !== "function") {
+                      throw new Error("Form edit tidak tersedia");
+                    }
+                    await vm.openEditModal(id);
+                  } catch (e) {
+                    Swal.fire({
+                      icon: "error",
+                      title: "Error",
+                      text: e.message || "Gagal membuka form edit",
+                    });
+                  }
+                }
 
-    async function _viewPenebusan(id) {
-      try {
-        const res = await fetch(`/transaction/penebusan/${id}/detail`);
-        if (!res.ok) throw new Error("Gagal memuat detail penebusan");
-        const data = await res.json();
-        const h = data.header || {};
-        const details = data.details || [];
-        const statusLabel =
-          h.status_label || (h.status === "CO" ? "Complete" : "Draft");
+                async function _viewPenebusan(id) {
+                  try {
+                    const res = await fetch(
+                      `/transaction/penebusan/${id}/detail`,
+                    );
+                    if (!res.ok)
+                      throw new Error("Gagal memuat detail penebusan");
+                    const data = await res.json();
+                    const h = data.header || {};
+                    const details = data.details || [];
+                    const statusLabel =
+                      h.status_label ||
+                      (h.status === "CO" ? "Complete" : "Draft");
 
-        const rows = details
-          .map(
-            (d, i) =>
-              `<tr>
+                    const rows = details
+                      .map(
+                        (d, i) =>
+                          `<tr>
                 <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:center;">${i + 1}</td>
                 <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;">${_escapeHtml(d.bbm_name || "-")}</td>
                 <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">${_fmtRp(d.jml_liter)} L</td>
@@ -990,15 +950,15 @@
                 <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">Rp ${_fmtRp(d.ppn_rp)}</td>
                 <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">Rp ${_fmtRp(d.total)}</td>
               </tr>`,
-          )
-          .join("");
+                      )
+                      .join("");
 
-        const statusClass =
-          h.status === "CO"
-            ? "background:#ecfdf5;color:#166534;border:1px solid #bbf7d0;"
-            : "background:#f8fafc;color:#475569;border:1px solid #e2e8f0;";
+                    const statusClass =
+                      h.status === "CO"
+                        ? "background:#ecfdf5;color:#166534;border:1px solid #bbf7d0;"
+                        : "background:#f8fafc;color:#475569;border:1px solid #e2e8f0;";
 
-        const html = `
+                    const html = `
           <div style="text-align:left;font-size:12px;color:#334155;line-height:1.35;">
             <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;align-items:center;">
               <span style="display:inline-flex;align-items:center;padding:4px 9px;border-radius:999px;background:#eef2ff;color:#1e3a8a;font-weight:700;border:1px solid #c7d2fe;">${_escapeHtml(h.no_penebusan || "-")}</span>
@@ -1038,184 +998,193 @@
             </div>
           </div>`;
 
-        Swal.fire({
-          title: "Detail Penebusan",
-          html,
-          width: 900,
-          confirmButtonText: "Tutup",
-        });
-      } catch (e) {
-        Swal.fire({
-          icon: "error",
-          title: "Error",
-          text: e.message || "Gagal memuat detail",
-        });
-      }
-    }
+                    Swal.fire({
+                      title: "Detail Penebusan",
+                      html,
+                      width: 900,
+                      confirmButtonText: "Tutup",
+                    });
+                  } catch (e) {
+                    Swal.fire({
+                      icon: "error",
+                      title: "Error",
+                      text: e.message || "Gagal memuat detail",
+                    });
+                  }
+                }
 
-    async function _deletePenebusan(id) {
-      const confirm = await Swal.fire({
-        icon: "warning",
-        title: "Hapus Penebusan?",
-        text: "Data akan dihapus.",
-        showCancelButton: true,
-        confirmButtonText: "Ya, Hapus",
-        cancelButtonText: "Batal",
-        confirmButtonColor: "#dc2626",
-      });
-      if (!confirm.isConfirmed) return;
+                async function _deletePenebusan(id) {
+                  const confirm = await Swal.fire({
+                    icon: "warning",
+                    title: "Hapus Penebusan?",
+                    text: "Data akan dihapus.",
+                    showCancelButton: true,
+                    confirmButtonText: "Ya, Hapus",
+                    cancelButtonText: "Batal",
+                    confirmButtonColor: "#dc2626",
+                  });
+                  if (!confirm.isConfirmed) return;
 
-      try {
-        const res = await fetch(`/transaction/penebusan/${id}/delete`, {
-          method: "POST",
-          headers: { Accept: "application/json" },
-        });
-        const contentType = res.headers.get("content-type") || "";
-        let data = null;
-        if (contentType.includes("application/json")) {
-          data = await res.json();
-        } else {
-          const txt = await res.text();
-          throw new Error(
-            res.status === 404
-              ? "Endpoint delete tidak ditemukan (404). Pastikan server terbaru sudah berjalan."
-              : txt || "Response server tidak valid",
-          );
-        }
-        if (!res.ok || !data.status) {
-          throw new Error(
-            (data && data.message) || "Gagal menghapus penebusan",
-          );
-        }
-        await Swal.fire({
-          icon: "success",
-          title: "Berhasil",
-          text: data.message || "Penebusan dihapus",
-          timer: 1300,
-          showConfirmButton: false,
-        });
+                  try {
+                    const res = await fetch(
+                      `/transaction/penebusan/${id}/delete`,
+                      {
+                        method: "POST",
+                        headers: { Accept: "application/json" },
+                      },
+                    );
+                    const contentType = res.headers.get("content-type") || "";
+                    let data = null;
+                    if (contentType.includes("application/json")) {
+                      data = await res.json();
+                    } else {
+                      const txt = await res.text();
+                      throw new Error(
+                        res.status === 404
+                          ? "Endpoint delete tidak ditemukan (404). Pastikan server terbaru sudah berjalan."
+                          : txt || "Response server tidak valid",
+                      );
+                    }
+                    if (!res.ok || !data.status) {
+                      throw new Error(
+                        (data && data.message) || "Gagal menghapus penebusan",
+                      );
+                    }
+                    await Swal.fire({
+                      icon: "success",
+                      title: "Berhasil",
+                      text: data.message || "Penebusan dihapus",
+                      timer: 1300,
+                      showConfirmButton: false,
+                    });
 
-        if (_selectedPenebusanId === id) {
-          _selectedPenebusanId = null;
-          window.dispatchEvent(new CustomEvent("clear-penebusan"));
-        }
-        if (_penebusanTable) _penebusanTable.ajax.reload(null, false);
-      } catch (e) {
-        Swal.fire({
-          icon: "error",
-          title: "Error",
-          text: e.message || "Terjadi kesalahan",
-        });
-      }
-    }
+                    if (_selectedPenebusanId === id) {
+                      _selectedPenebusanId = null;
+                      window.dispatchEvent(new CustomEvent("clear-penebusan"));
+                    }
+                    if (_penebusanTable)
+                      _penebusanTable.ajax.reload(null, false);
+                  } catch (e) {
+                    Swal.fire({
+                      icon: "error",
+                      title: "Error",
+                      text: e.message || "Terjadi kesalahan",
+                    });
+                  }
+                }
 
-    // â”€â”€ Trigger row selection (called from DT row click or action button) â”€â”€â”€â”€â”€â”€
-    function _triggerSelect(id) {
-      if (_selectedPenebusanId === id) return;
-      _selectedPenebusanId = id;
-      // Highlight row
-      if (_penebusanTable) {
-        $("#penebusanTable tbody tr").removeClass("dt-selected");
-        _penebusanTable.rows().every(function () {
-          if (this.data() && this.data().id === id) {
-            $(this.node()).addClass("dt-selected");
-          }
-        });
-      }
-      // Notify Alpine detail panel
-      window.dispatchEvent(
-        new CustomEvent("select-penebusan", { detail: { id } }),
-      );
-    }
+                // â”€â”€ Trigger row selection (called from DT row click or action button) â”€â”€â”€â”€â”€â”€
+                function _triggerSelect(id) {
+                  if (_selectedPenebusanId === id) return;
+                  _selectedPenebusanId = id;
+                  // Highlight row
+                  if (_penebusanTable) {
+                    $("#penebusanTable tbody tr").removeClass("dt-selected");
+                    _penebusanTable.rows().every(function () {
+                      if (this.data() && this.data().id === id) {
+                        $(this.node()).addClass("dt-selected");
+                      }
+                    });
+                  }
+                  // Notify Alpine detail panel
+                  window.dispatchEvent(
+                    new CustomEvent("select-penebusan", { detail: { id } }),
+                  );
+                }
 
-    // â”€â”€ DataTables init â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    $(document).ready(function () {
-      _penebusanTable = $("#penebusanTable").DataTable({
-        serverSide: true,
-        processing: true,
-        ajax: {
-          url: "/transaction/penebusan/datatable",
-          type: "POST",
-          error: function (xhr, err) {
-            console.error("DataTables AJAX error:", err, xhr.responseText);
-          },
-        },
-        language: {
-          search: "Cari:",
-          lengthMenu: "Tampilkan _MENU_ data",
-          info: "Menampilkan _START_â€“_END_ dari _TOTAL_ data",
-          infoEmpty: "Tidak ada data",
-          infoFiltered: "(disaring dari _MAX_ total data)",
-          zeroRecords: "Tidak ada data yang sesuai",
-          emptyTable: "Belum ada data penebusan",
-          paginate: {
-            first: "\u00AB",
-            last: "\u00BB",
-            next: "\u203A",
-            previous: "\u2039",
-          },
-          processing: "Memuat data...",
-        },
-        order: [[1, "desc"]],
-        columns: [
-          {
-            data: null,
-            orderable: false,
-            searchable: false,
-            className: "px-4 py-3.5 text-center text-slate-500",
-            render: function (d, t, r, meta) {
-              return meta.row + meta.settings._iDisplayStart + 1;
-            },
-          },
-          {
-            data: "tgl_penebusan",
-            className: "px-4 py-3.5 text-slate-700 whitespace-nowrap",
-            render: function (d) {
-              return _fmtDate(d);
-            },
-          },
-          {
-            data: "no_penebusan",
-            className: "px-4 py-3.5",
-            render: function (d) {
-              return `<span class="font-semibold text-[#005596]">${d}</span>`;
-            },
-          },
-          {
-            data: "no_so",
-            className: "px-4 py-3.5 text-slate-500",
-            render: function (d) {
-              return d || "â€”";
-            },
-          },
-          {
-            data: "adm_bank",
-            className: "px-4 py-3.5 text-right text-slate-600",
-            render: function (d) {
-              return "Rp " + _fmtRp(d);
-            },
-          },
-          {
-            data: "total_bayar",
-            className: "px-4 py-3.5 text-right",
-            render: function (d) {
-              return `<span class="font-semibold text-slate-800">Rp ${_fmtRp(d)}</span>`;
-            },
-          },
-          {
-            data: "status",
-            className: "px-4 py-3.5 text-center",
-            render: function (d) {
-              return _statusBadge(d);
-            },
-          },
-          {
-            data: null,
-            orderable: false,
-            searchable: false,
-            className: "px-4 py-3.5 text-center",
-            render: function (d, t, row) {
-              return `<div class="flex items-center justify-center gap-2">
+                // â”€â”€ DataTables init â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                $(document).ready(function () {
+                  _penebusanTable = $("#penebusanTable").DataTable({
+                    serverSide: true,
+                    processing: true,
+                    ajax: {
+                      url: "/transaction/penebusan/datatable",
+                      type: "POST",
+                      error: function (xhr, err) {
+                        console.error(
+                          "DataTables AJAX error:",
+                          err,
+                          xhr.responseText,
+                        );
+                      },
+                    },
+                    language: {
+                      search: "Cari:",
+                      lengthMenu: "Tampilkan _MENU_ data",
+                      info: "Menampilkan _START_-_END_ dari _TOTAL_ data",
+                      infoEmpty: "Tidak ada data",
+                      infoFiltered: "(disaring dari _MAX_ total data)",
+                      zeroRecords: "Tidak ada data yang sesuai",
+                      emptyTable: "Belum ada data penebusan",
+                      paginate: {
+                        first: "\u00AB",
+                        last: "\u00BB",
+                        next: "\u203A",
+                        previous: "\u2039",
+                      },
+                      processing: "Memuat data...",
+                    },
+                    order: [[1, "desc"]],
+                    columns: [
+                      {
+                        data: null,
+                        orderable: false,
+                        searchable: false,
+                        className: "px-4 py-3.5 text-center text-slate-500",
+                        render: function (d, t, r, meta) {
+                          return meta.row + meta.settings._iDisplayStart + 1;
+                        },
+                      },
+                      {
+                        data: "tgl_penebusan",
+                        className:
+                          "px-4 py-3.5 text-slate-700 whitespace-nowrap",
+                        render: function (d) {
+                          return _fmtDate(d);
+                        },
+                      },
+                      {
+                        data: "no_penebusan",
+                        className: "px-4 py-3.5",
+                        render: function (d) {
+                          return `<span class="font-semibold text-[#005596]">${d}</span>`;
+                        },
+                      },
+                      {
+                        data: "no_so",
+                        className: "px-4 py-3.5 text-slate-500",
+                        render: function (d) {
+                          return d || "â€”";
+                        },
+                      },
+                      {
+                        data: "adm_bank",
+                        className: "px-4 py-3.5 text-right text-slate-600",
+                        render: function (d) {
+                          return "Rp " + _fmtRp(d);
+                        },
+                      },
+                      {
+                        data: "total_bayar",
+                        className: "px-4 py-3.5 text-right",
+                        render: function (d) {
+                          return `<span class="font-semibold text-slate-800">Rp ${_fmtRp(d)}</span>`;
+                        },
+                      },
+                      {
+                        data: "status",
+                        className: "px-4 py-3.5 text-center",
+                        render: function (d) {
+                          return _statusBadge(d);
+                        },
+                      },
+                      {
+                        data: null,
+                        orderable: false,
+                        searchable: false,
+                        className: "px-4 py-3.5 text-center",
+                        render: function (d, t, row) {
+                          return `<div class="flex items-center justify-center gap-2">
               <button onclick="event.stopPropagation();_viewPenebusan(${row.id})" title="View"
                 class="w-8 h-8 rounded-lg bg-blue-50 hover:bg-blue-100 text-[#005596] flex items-center justify-center transition-colors">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1236,319 +1205,95 @@
                 </svg>
               </button>
             </div>`;
-            },
-          },
-        ],
-        createdRow: function (row, data) {
-          $(row).on("click", function () {
-            _triggerSelect(data.id);
-          });
-        },
-        drawCallback: function () {
-          // Re-apply selected highlight after pagination/search redraw
-          if (_selectedPenebusanId) {
-            _penebusanTable.rows().every(function () {
-              if (this.data() && this.data().id === _selectedPenebusanId) {
-                $(this.node()).addClass("dt-selected");
-              }
-            });
-          }
-        },
-      });
-    });
-  </script>
+                        },
+                      },
+                    ],
+                    createdRow: function (row, data) {
+                      $(row).on("click", function () {
+                        _triggerSelect(data.id);
+                      });
+                    },
+                    drawCallback: function () {
+                      // Re-apply selected highlight after pagination/search redraw
+                      if (_selectedPenebusanId) {
+                        _penebusanTable.rows().every(function () {
+                          if (
+                            this.data() &&
+                            this.data().id === _selectedPenebusanId
+                          ) {
+                            $(this.node()).addClass("dt-selected");
+                          }
+                        });
+                      }
+                    },
+                  });
+                });
+              </script>
 
-  <!-- ═══════════════════════════════════════════════════════════════════════════ -->
-  <!-- MODAL — Tambah Penebusan                                                   -->
-  <!-- ═══════════════════════════════════════════════════════════════════════════ -->
-  <div
-    id="penebusan-modal"
-    x-show="isOpen"
-    x-cloak
-    x-transition:enter="transition ease-out duration-200"
-    x-transition:enter-start="opacity-0"
-    x-transition:enter-end="opacity-100"
-    x-transition:leave="transition ease-in duration-150"
-    x-transition:leave-start="opacity-100"
-    x-transition:leave-end="opacity-0"
-    class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm py-6 px-4 overflow-y-auto"
-    style="display: none"
-  >
-    <div
-      x-transition:enter="transition ease-out duration-200"
-      x-transition:enter-start="opacity-0 scale-95 translate-y-2"
-      x-transition:enter-end="opacity-100 scale-100 translate-y-0"
-      x-transition:leave="transition ease-in duration-150"
-      x-transition:leave-start="opacity-100 scale-100 translate-y-0"
-      x-transition:leave-end="opacity-0 scale-95 translate-y-2"
-      class="bg-white rounded-2xl shadow-2xl w-[90vw] max-w-[90vw] my-auto"
-      @click.stop
-    >
-      <!-- Modal Header -->
-      <div
-        class="flex items-center justify-between px-6 py-4 border-b border-slate-100"
-      >
-        <div class="flex items-center gap-3">
-          <div
-            class="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center"
-          >
-            <svg
-              class="w-5 h-5 text-[#005596]"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
-          </div>
-          <div>
-            <h3 class="text-base font-semibold text-slate-800">
-              <span x-text="modalTitle"></span>
-            </h3>
-            <p class="text-xs text-slate-400">
-              Isi data header dan rincian BBM yang ditebus
-            </p>
-          </div>
-        </div>
-        <button
-          type="button"
-          @click="closeCreateModal()"
-          class="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center transition-colors"
-        >
-          <svg
-            class="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </button>
-      </div>
-
-      <!-- Modal Body -->
-      <div class="px-6 py-5 space-y-6 max-h-[75vh] overflow-y-auto">
-        <!-- ── Seksi 1: Data Header ─────────────────────────────────────────── -->
-        <div>
-          <h4
-            class="text-sm font-semibold text-slate-600 uppercase tracking-wider mb-4 flex items-center gap-2"
-          >
-            <span
-              class="w-5 h-5 rounded-full bg-[#005596] text-white text-xs flex items-center justify-center font-bold"
-              >1</span
-            >
-            Data Penebusan
-          </h4>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <!-- No. SO Pertamina -->
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1.5"
-                >No. SO Pertamina
-                <span class="text-slate-400 font-normal"
-                  >(opsional)</span
-                ></label
-              >
-              <input
-                type="text"
-                x-model="form.no_so"
-                placeholder="SO-XXXXXX"
-                class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
-              />
-            </div>
-
-            <!-- Tanggal Penebusan -->
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1.5"
-                >Tanggal Penebusan <span class="text-red-400">*</span></label
-              >
-              <input
-                type="date"
-                x-model="form.tgl_penebusan"
-                class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
-              />
-            </div>
-
-            <!-- Tanggal Bayar -->
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1.5"
-                >Tanggal Bayar
-                <span class="text-slate-400 font-normal"
-                  >(jika sudah bayar)</span
-                ></label
-              >
-              <input
-                type="date"
-                x-model="form.tgl_bayar"
-                class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
-              />
-            </div>
-
-            <!-- Wallet / Rekening Bank -->
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1.5"
-                >Rekening / Wallet Pembayaran</label
-              >
-              <select
-                x-model.number="form.wallet_id"
-                class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
-              >
-                <option value="">— Pilih Rekening —</option>
-                {{ range .Wallets }}
-                <option value="{{ .ID }}">{{ .WalletName }}</option>
-                {{ end }}
-              </select>
-            </div>
-
-            <!-- Biaya Admin Bank -->
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1.5"
-                >Biaya Admin Bank (Rp)</label
-              >
-              <input
-                type="text"
-                x-model="form.adm_bank_display"
-                @input="form.adm_bank_display = fmtInput($event.target.value); form.adm_bank = parseRp($event.target.value); recalcTotal()"
-                placeholder="0"
-                class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white text-right"
-              />
-            </div>
-
-            <!-- Catatan -->
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1.5"
-                >Catatan</label
-              >
-              <textarea
-                x-model="form.catatan"
-                rows="2"
-                placeholder="Catatan tambahan (opsional)..."
-                class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white resize-none"
-              ></textarea>
-            </div>
-          </div>
-        </div>
-
-        <!-- Divider -->
-        <div class="border-t border-slate-100"></div>
-
-        <!-- ── Seksi 2: Rincian Item BBM ───────────────────────────────────── -->
-        <div>
-          <div class="flex items-center mb-4">
-            <h4
-              class="text-sm font-semibold text-slate-600 uppercase tracking-wider flex items-center gap-2"
-            >
-              <span
-                class="w-5 h-5 rounded-full bg-[#509E2F] text-white text-xs flex items-center justify-center font-bold"
-                >2</span
-              >
-              Rincian BBM
-            </h4>
-          </div>
-
-          <!-- Items (single-row layout) -->
-          <div class="overflow-x-auto md:overflow-x-visible">
-            <div class="min-w-[860px] md:min-w-0 space-y-2">
+              <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+              <!-- MODAL — Tambah Penebusan                                                   -->
+              <!-- ═══════════════════════════════════════════════════════════════════════════ -->
               <div
-                class="grid grid-cols-9 gap-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wider px-2"
+                id="penebusan-modal"
+                x-show="isOpen"
+                x-cloak
+                x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100"
+                x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0"
+                class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm py-6 px-4 overflow-y-auto"
+                style="display: none"
               >
-                <div class="col-span-2">Jenis BBM</div>
-                <div class="col-span-1 text-right">Jml Liter</div>
-                <div class="col-span-1 text-right">Harga Beli/L</div>
-                <div class="col-span-2 text-right">Subtotal</div>
-                <div class="col-span-1 text-right">Pajak</div>
-                <div class="col-span-1 text-right">Total</div>
-                <div class="col-span-1 text-center">Aksi</div>
-              </div>
-
-              <template x-for="(item, idx) in form.items" :key="item._key">
                 <div
-                  class="grid grid-cols-9 gap-2 p-2 border border-slate-200 rounded-xl bg-slate-50/50"
+                  x-transition:enter="transition ease-out duration-200"
+                  x-transition:enter-start="opacity-0 scale-95 translate-y-2"
+                  x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                  x-transition:leave="transition ease-in duration-150"
+                  x-transition:leave-start="opacity-100 scale-100 translate-y-0"
+                  x-transition:leave-end="opacity-0 scale-95 translate-y-2"
+                  class="bg-white rounded-2xl shadow-2xl w-[90vw] max-w-[90vw] my-auto"
+                  @click.stop
                 >
-                  <div class="col-span-2">
-                    <select
-                      x-model.number="item.bbm_id"
-                      @change="onBBMChange(idx)"
-                      class="w-full px-2.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
-                    >
-                      <option value="">— Pilih BBM —</option>
-                      {{ range .BBMs }}
-                      <option
-                        value="{{ .ID }}"
-                        data-price="{{ .Price }}"
-                        data-margin="{{ .Margin }}"
+                  <!-- Modal Header -->
+                  <div
+                    class="flex items-center justify-between px-6 py-4 border-b border-slate-100"
+                  >
+                    <div class="flex items-center gap-3">
+                      <div
+                        class="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center"
                       >
-                        {{ .Name }}
-                      </option>
-                      {{ end }}
-                    </select>
-                  </div>
-
-                  <div class="col-span-1">
-                    <input
-                      type="text"
-                      :value="item.jml_liter_display"
-                      @input="item.jml_liter_display = fmtInput($event.target.value); item.jml_liter = parseRp($event.target.value); recalcItem(idx)"
-                      placeholder="0"
-                      class="w-full px-2.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white text-right"
-                    />
-                  </div>
-
-                  <div class="col-span-1">
-                    <input
-                      type="text"
-                      :value="item.harga_dasar_display"
-                      readonly
-                      class="w-full px-2.5 py-2 text-sm border border-slate-100 rounded-lg bg-slate-100 text-slate-500 text-right cursor-not-allowed"
-                    />
-                  </div>
-
-                  <div class="col-span-2">
-                    <input
-                      type="text"
-                      :value="fmtRp(item.subtotal)"
-                      readonly
-                      class="w-full px-2.5 py-2 text-sm border border-slate-100 rounded-lg bg-slate-100 text-slate-600 text-right cursor-not-allowed"
-                    />
-                  </div>
-
-                  <div class="col-span-1">
-                    <input
-                      type="text"
-                      :value="fmtRp(item.ppn_rp)"
-                      readonly
-                      class="w-full px-2.5 py-2 text-sm border border-slate-100 rounded-lg bg-amber-50 text-amber-700 text-right cursor-not-allowed"
-                    />
-                  </div>
-
-                  <div class="col-span-1">
-                    <input
-                      type="text"
-                      :value="fmtRp(item.total)"
-                      readonly
-                      class="w-full px-2.5 py-2 text-sm border border-blue-100 rounded-lg bg-blue-50 text-[#005596] font-semibold text-right cursor-not-allowed"
-                    />
-                  </div>
-
-                  <div class="col-span-1 flex items-center justify-center">
+                        <svg
+                          class="w-5 h-5 text-[#005596]"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                          />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 class="text-base font-semibold text-slate-800">
+                          <span x-text="modalTitle"></span>
+                        </h3>
+                        <p class="text-xs text-slate-400">
+                          Isi data header dan rincian BBM yang ditebus
+                        </p>
+                      </div>
+                    </div>
                     <button
-                      @click="removeItem(idx)"
-                      x-show="form.items.length > 1"
                       type="button"
-                      class="w-8 h-8 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center transition-colors"
-                      title="Hapus item ini"
+                      @click="closeCreateModal()"
+                      class="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center transition-colors"
                     >
                       <svg
-                        class="w-4 h-4"
+                        class="w-5 h-5"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -1562,152 +1307,411 @@
                       </svg>
                     </button>
                   </div>
+
+                  <!-- Modal Body -->
+                  <div class="px-6 py-5 space-y-6 max-h-[75vh] overflow-y-auto">
+                    <!-- ── Seksi 1: Data Header ─────────────────────────────────────────── -->
+                    <div>
+                      <h4
+                        class="text-sm font-semibold text-slate-600 uppercase tracking-wider mb-4 flex items-center gap-2"
+                      >
+                        <span
+                          class="w-5 h-5 rounded-full bg-[#005596] text-white text-xs flex items-center justify-center font-bold"
+                          >1</span
+                        >
+                        Data Penebusan
+                      </h4>
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- No. SO Pertamina -->
+                        <div>
+                          <label
+                            class="block text-xs font-medium text-slate-600 mb-1.5"
+                            >No. SO Pertamina
+                            <span class="text-slate-400 font-normal"
+                              >(opsional)</span
+                            ></label
+                          >
+                          <input
+                            type="text"
+                            x-model="form.no_so"
+                            placeholder="SO-XXXXXX"
+                            class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
+                          />
+                        </div>
+
+                        <!-- Tanggal Penebusan -->
+                        <div>
+                          <label
+                            class="block text-xs font-medium text-slate-600 mb-1.5"
+                            >Tanggal Penebusan
+                            <span class="text-red-400">*</span></label
+                          >
+                          <input
+                            type="date"
+                            x-model="form.tgl_penebusan"
+                            class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
+                          />
+                        </div>
+
+                        <!-- Tanggal Bayar -->
+                        <div>
+                          <label
+                            class="block text-xs font-medium text-slate-600 mb-1.5"
+                            >Tanggal Bayar
+                            <span class="text-slate-400 font-normal"
+                              >(jika sudah bayar)</span
+                            ></label
+                          >
+                          <input
+                            type="date"
+                            x-model="form.tgl_bayar"
+                            class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
+                          />
+                        </div>
+
+                        <!-- Wallet / Rekening Bank -->
+                        <div>
+                          <label
+                            class="block text-xs font-medium text-slate-600 mb-1.5"
+                            >Rekening / Wallet Pembayaran</label
+                          >
+                          <select
+                            x-model.number="form.wallet_id"
+                            class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
+                          >
+                            <option value="">— Pilih Rekening —</option>
+                            {{ range .Wallets }}
+                            <option value="{{ .ID }}">{{ .WalletName }}</option>
+                            {{ end }}
+                          </select>
+                        </div>
+
+                        <!-- Biaya Admin Bank -->
+                        <div>
+                          <label
+                            class="block text-xs font-medium text-slate-600 mb-1.5"
+                            >Biaya Admin Bank (Rp)</label
+                          >
+                          <input
+                            type="text"
+                            x-model="form.adm_bank_display"
+                            @input="form.adm_bank_display = fmtInput($event.target.value); form.adm_bank = parseRp($event.target.value); recalcTotal()"
+                            placeholder="0"
+                            class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white text-right"
+                          />
+                        </div>
+
+                        <!-- Catatan -->
+                        <div>
+                          <label
+                            class="block text-xs font-medium text-slate-600 mb-1.5"
+                            >Catatan</label
+                          >
+                          <textarea
+                            x-model="form.catatan"
+                            rows="2"
+                            placeholder="Catatan tambahan (opsional)..."
+                            class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white resize-none"
+                          ></textarea>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Divider -->
+                    <div class="border-t border-slate-100"></div>
+
+                    <!-- ── Seksi 2: Rincian Item BBM ───────────────────────────────────── -->
+                    <div>
+                      <div class="flex items-center mb-4">
+                        <h4
+                          class="text-sm font-semibold text-slate-600 uppercase tracking-wider flex items-center gap-2"
+                        >
+                          <span
+                            class="w-5 h-5 rounded-full bg-[#509E2F] text-white text-xs flex items-center justify-center font-bold"
+                            >2</span
+                          >
+                          Rincian BBM
+                        </h4>
+                      </div>
+
+                      <!-- Items (single-row layout) -->
+                      <div class="overflow-x-auto md:overflow-x-visible">
+                        <div class="min-w-[860px] md:min-w-0 space-y-2">
+                          <div
+                            class="grid grid-cols-9 gap-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wider px-2"
+                          >
+                            <div class="col-span-2">Jenis BBM</div>
+                            <div class="col-span-1 text-right">Jml Liter</div>
+                            <div class="col-span-1 text-right">
+                              Harga Beli/L
+                            </div>
+                            <div class="col-span-2 text-right">Subtotal</div>
+                            <div class="col-span-1 text-right">Pajak</div>
+                            <div class="col-span-1 text-right">Total</div>
+                            <div class="col-span-1 text-center">Aksi</div>
+                          </div>
+
+                          <template
+                            x-for="(item, idx) in form.items"
+                            :key="item._key"
+                          >
+                            <div
+                              class="grid grid-cols-9 gap-2 p-2 border border-slate-200 rounded-xl bg-slate-50/50"
+                            >
+                              <div class="col-span-2">
+                                <select
+                                  x-model.number="item.bbm_id"
+                                  @change="onBBMChange(idx)"
+                                  class="w-full px-2.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
+                                >
+                                  <option value="">— Pilih BBM —</option>
+                                  {{ range .BBMs }}
+                                  <option
+                                    value="{{ .ID }}"
+                                    data-price="{{ .Price }}"
+                                    data-margin="{{ .Margin }}"
+                                  >
+                                    {{ .Name }}
+                                  </option>
+                                  {{ end }}
+                                </select>
+                              </div>
+
+                              <div class="col-span-1">
+                                <input
+                                  type="text"
+                                  :value="item.jml_liter_display"
+                                  @input="item.jml_liter_display = fmtInput($event.target.value); item.jml_liter = parseRp($event.target.value); recalcItem(idx)"
+                                  placeholder="0"
+                                  class="w-full px-2.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white text-right"
+                                />
+                              </div>
+
+                              <div class="col-span-1">
+                                <input
+                                  type="text"
+                                  :value="item.harga_dasar_display"
+                                  readonly
+                                  class="w-full px-2.5 py-2 text-sm border border-slate-100 rounded-lg bg-slate-100 text-slate-500 text-right cursor-not-allowed"
+                                />
+                              </div>
+
+                              <div class="col-span-2">
+                                <input
+                                  type="text"
+                                  :value="fmtRp(item.subtotal)"
+                                  readonly
+                                  class="w-full px-2.5 py-2 text-sm border border-slate-100 rounded-lg bg-slate-100 text-slate-600 text-right cursor-not-allowed"
+                                />
+                              </div>
+
+                              <div class="col-span-1">
+                                <input
+                                  type="text"
+                                  :value="fmtRp(item.ppn_rp)"
+                                  readonly
+                                  class="w-full px-2.5 py-2 text-sm border border-slate-100 rounded-lg bg-amber-50 text-amber-700 text-right cursor-not-allowed"
+                                />
+                              </div>
+
+                              <div class="col-span-1">
+                                <input
+                                  type="text"
+                                  :value="fmtRp(item.total)"
+                                  readonly
+                                  class="w-full px-2.5 py-2 text-sm border border-blue-100 rounded-lg bg-blue-50 text-[#005596] font-semibold text-right cursor-not-allowed"
+                                />
+                              </div>
+
+                              <div
+                                class="col-span-1 flex items-center justify-center"
+                              >
+                                <button
+                                  @click="removeItem(idx)"
+                                  x-show="form.items.length > 1"
+                                  type="button"
+                                  class="w-8 h-8 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center transition-colors"
+                                  title="Hapus item ini"
+                                >
+                                  <svg
+                                    class="w-4 h-4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      stroke-linecap="round"
+                                      stroke-linejoin="round"
+                                      stroke-width="2"
+                                      d="M6 18L18 6M6 6l12 12"
+                                    />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+                          </template>
+                        </div>
+                      </div>
+
+                      <!-- Empty items state -->
+                      <template x-if="form.items.length === 0">
+                        <div
+                          class="text-center py-8 text-slate-400 text-sm border border-dashed border-slate-200 rounded-xl"
+                        >
+                          Belum ada item BBM. Klik "+ Tambah Item BBM" untuk
+                          menambahkan.
+                        </div>
+                      </template>
+
+                      <div class="mt-4 flex justify-end">
+                        <button
+                          @click="addItem()"
+                          type="button"
+                          class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#509E2F] border border-[#509E2F] rounded-lg hover:bg-green-50 transition-colors"
+                        >
+                          <svg
+                            class="w-3.5 h-3.5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              stroke-width="2"
+                              d="M12 4v16m8-8H4"
+                            />
+                          </svg>
+                          Tambah Item BBM
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Divider -->
+                    <div class="border-t border-slate-100"></div>
+
+                    <!-- ── Ringkasan Grand Total ───────────────────────────────────────── -->
+                    <div
+                      class="bg-slate-50/80 border border-slate-200 rounded-xl p-4"
+                    >
+                      <h4
+                        class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3"
+                      >
+                        Ringkasan
+                      </h4>
+                      <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                          <span class="text-slate-600"
+                            >Subtotal (sebelum PPN)</span
+                          >
+                          <span
+                            class="font-medium text-slate-700"
+                            x-text="'Rp ' + fmtRp(summary.subtotal)"
+                          ></span>
+                        </div>
+                        <div class="flex justify-between">
+                          <span class="text-amber-600">Total PPN</span>
+                          <span
+                            class="font-medium text-amber-700"
+                            x-text="'Rp ' + fmtRp(summary.total_ppn)"
+                          ></span>
+                        </div>
+                        <div class="flex justify-between">
+                          <span class="text-slate-600">Biaya Admin Bank</span>
+                          <span
+                            class="font-medium text-slate-700"
+                            x-text="'Rp ' + fmtRp(form.adm_bank)"
+                          ></span>
+                        </div>
+                        <div
+                          class="border-t border-slate-200 pt-2 flex justify-between"
+                        >
+                          <span class="font-semibold text-slate-800"
+                            >Total Bayar</span
+                          >
+                          <span
+                            class="font-bold text-lg text-[#005596]"
+                            x-text="'Rp ' + fmtRp(summary.total_bayar)"
+                          ></span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <!-- /Modal Body -->
+
+                  <!-- Modal Footer -->
+                  <div
+                    class="px-6 py-4 border-t border-slate-100 flex items-center justify-between gap-3"
+                  >
+                    <div class="flex flex-col gap-2">
+                      <p class="text-xs text-slate-400">
+                        Kolom bertanda <span class="text-red-400">*</span> wajib
+                        diisi
+                      </p>
+                      <div
+                        x-show="hasSaved"
+                        x-cloak
+                        class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold"
+                      >
+                        <span
+                          class="w-2 h-2 rounded-full bg-emerald-500"
+                        ></span>
+                        Dokumen sudah tersimpan
+                        <span
+                          x-show="savedNoPenebusan"
+                          x-text="': ' + savedNoPenebusan"
+                        ></span>
+                      </div>
+                    </div>
+                    <div class="flex gap-3">
+                      <button
+                        @click="onSecondaryAction()"
+                        type="button"
+                        class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors font-medium"
+                        x-text="secondaryActionLabel"
+                      ></button>
+                      <button
+                        type="button"
+                        :disabled="isSubmitting"
+                        @click="submitPenebusan('save')"
+                        class="px-5 py-2 text-sm bg-slate-700 hover:bg-slate-800 text-white rounded-lg font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        Save
+                      </button>
+                      <button
+                        x-show="showSaveComplete"
+                        type="button"
+                        :disabled="isSubmitting"
+                        @click="submitPenebusan('complete')"
+                        class="px-5 py-2 text-sm bg-[#005596] hover:bg-blue-800 text-white rounded-lg font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        <svg
+                          class="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                        Save &amp; Complete
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </template>
+              </div>
+              <!-- /MODAL -->
             </div>
+            <!-- /x-data="penebusanPage()" -->
+
+            {{ template "footer.html" . }} {{ end }}
           </div>
-
-          <!-- Empty items state -->
-          <template x-if="form.items.length === 0">
-            <div
-              class="text-center py-8 text-slate-400 text-sm border border-dashed border-slate-200 rounded-xl"
-            >
-              Belum ada item BBM. Klik "+ Tambah Item BBM" untuk menambahkan.
-            </div>
-          </template>
-
-          <div class="mt-4 flex justify-end">
-            <button
-              @click="addItem()"
-              type="button"
-              class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#509E2F] border border-[#509E2F] rounded-lg hover:bg-green-50 transition-colors"
-            >
-              <svg
-                class="w-3.5 h-3.5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
-              Tambah Item BBM
-            </button>
-          </div>
-        </div>
-
-        <!-- Divider -->
-        <div class="border-t border-slate-100"></div>
-
-        <!-- ── Ringkasan Grand Total ───────────────────────────────────────── -->
-        <div class="bg-slate-50/80 border border-slate-200 rounded-xl p-4">
-          <h4
-            class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3"
-          >
-            Ringkasan
-          </h4>
-          <div class="space-y-2 text-sm">
-            <div class="flex justify-between">
-              <span class="text-slate-600">Subtotal (sebelum PPN)</span>
-              <span
-                class="font-medium text-slate-700"
-                x-text="'Rp ' + fmtRp(summary.subtotal)"
-              ></span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-amber-600">Total PPN</span>
-              <span
-                class="font-medium text-amber-700"
-                x-text="'Rp ' + fmtRp(summary.total_ppn)"
-              ></span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-slate-600">Biaya Admin Bank</span>
-              <span
-                class="font-medium text-slate-700"
-                x-text="'Rp ' + fmtRp(form.adm_bank)"
-              ></span>
-            </div>
-            <div class="border-t border-slate-200 pt-2 flex justify-between">
-              <span class="font-semibold text-slate-800">Total Bayar</span>
-              <span
-                class="font-bold text-lg text-[#005596]"
-                x-text="'Rp ' + fmtRp(summary.total_bayar)"
-              ></span>
-            </div>
-          </div>
-        </div>
-      </div>
-      <!-- /Modal Body -->
-
-      <!-- Modal Footer -->
-      <div
-        class="px-6 py-4 border-t border-slate-100 flex items-center justify-between gap-3"
+        </div></template
       >
-        <div class="flex flex-col gap-2">
-          <p class="text-xs text-slate-400">
-            Kolom bertanda <span class="text-red-400">*</span> wajib diisi
-          </p>
-          <div
-            x-show="hasSaved"
-            x-cloak
-            class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold"
-          >
-            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-            Dokumen sudah tersimpan
-            <span
-              x-show="savedNoPenebusan"
-              x-text="': ' + savedNoPenebusan"
-            ></span>
-          </div>
-        </div>
-        <div class="flex gap-3">
-          <button
-            @click="onSecondaryAction()"
-            type="button"
-            class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors font-medium"
-            x-text="secondaryActionLabel"
-          ></button>
-          <button
-            type="button"
-            :disabled="isSubmitting"
-            @click="submitPenebusan('save')"
-            class="px-5 py-2 text-sm bg-slate-700 hover:bg-slate-800 text-white rounded-lg font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            Save
-          </button>
-          <button
-            x-show="showSaveComplete"
-            type="button"
-            :disabled="isSubmitting"
-            @click="submitPenebusan('complete')"
-            class="px-5 py-2 text-sm bg-[#005596] hover:bg-blue-800 text-white rounded-lg font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            <svg
-              class="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M5 13l4 4L19 7"
-              />
-            </svg>
-            Save &amp; Complete
-          </button>
-        </div>
-      </div>
     </div>
   </div>
-  <!-- /MODAL -->
 </div>
-<!-- /x-data="penebusanPage()" -->
-
-{{ template "footer.html" . }} {{ end }}

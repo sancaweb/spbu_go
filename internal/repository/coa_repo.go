@@ -148,6 +148,8 @@ type JournalEntryRepository interface {
 	FindByRef(refType string, refID uint) ([]entity.JournalEntry, error)
 	Create(entry *entity.JournalEntry) error
 	CreateBatch(entries []entity.JournalEntry) error
+	// DeleteByRef removes all journal entries linked to a source transaction (for reversal / re-post).
+	DeleteByRef(refType string, refID uint) error
 }
 
 type journalEntryRepository struct{ db *gorm.DB }
@@ -184,4 +186,9 @@ func (r *journalEntryRepository) CreateBatch(entries []entity.JournalEntry) erro
 		return nil
 	}
 	return r.db.Omit("COA", "Wallet", "Creator").CreateInBatches(entries, 100).Error
+}
+
+func (r *journalEntryRepository) DeleteByRef(refType string, refID uint) error {
+	return r.db.Where("ref_type = ? AND ref_id = ?", refType, refID).
+		Delete(&entity.JournalEntry{}).Error
 }

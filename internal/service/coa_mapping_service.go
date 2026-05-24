@@ -11,10 +11,10 @@ import (
 // ─── TransTypeInfo describes a transaction type and its expected mapping roles ─
 
 type MappingRole struct {
-	Role    string
-	Label   string
-	IsBBM   bool   // true = one row per BBM
-	DC      string // "D" = debit, "C" = kredit
+	Role  string
+	Label string
+	IsBBM bool   // true = one row per BBM
+	DC    string // "D" = debit, "C" = kredit
 }
 
 type TransTypeInfo struct {
@@ -49,6 +49,7 @@ func AllTransTypes() []TransTypeInfo {
 			Label: "Penebusan / Pembelian BBM ke Pertamina",
 			Roles: []MappingRole{
 				{Role: "debit_uang_muka", Label: "Uang Muka Penebusan Pertamina", IsBBM: false, DC: "D"},
+				{Role: "debit_adm_bank", Label: "Biaya Admin Bank Penebusan (per jenis BBM)", IsBBM: true, DC: "D"},
 				{Role: "kredit_bank", Label: "Bank Pembayaran", IsBBM: false, DC: "C"},
 			},
 		},
@@ -169,11 +170,11 @@ func (s *coaMappingService) GenerateCOAForBBM(bbm *entity.BBM, createdBy *uint) 
 	name := bbm.Name
 
 	type coaGen struct {
-		prefix  string // e.g. "112"
-		typeID  func() uint
-		name    string
-		desc    string
-		isHdr   bool
+		prefix   string // e.g. "112"
+		typeID   func() uint
+		name     string
+		desc     string
+		isHdr    bool
 		isSystem bool
 	}
 
@@ -196,8 +197,8 @@ func (s *coaMappingService) GenerateCOAForBBM(bbm *entity.BBM, createdBy *uint) 
 		acctDesc   string
 		isSystem   bool
 		// which roles to create mappings for after creation
-		transType string
-		role      string
+		transType  string
+		role       string
 		mappingLbl string
 	}
 
@@ -242,7 +243,8 @@ func (s *coaMappingService) GenerateCOAForBBM(bbm *entity.BBM, createdBy *uint) 
 			acctName:   fmt.Sprintf("Biaya Admin Bank Penebusan \u2014 %s", name),
 			acctDesc:   fmt.Sprintf("Biaya admin bank saat penebusan %s online", name),
 			isSystem:   true,
-			transType:  "", role: "",
+			transType:  "penebusan", role: "debit_adm_bank",
+			mappingLbl: fmt.Sprintf("Biaya Admin Bank Penebusan \u2014 %s", name),
 		},
 		{
 			prefix:     "512",

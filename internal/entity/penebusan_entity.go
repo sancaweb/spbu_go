@@ -91,7 +91,8 @@ type TrxPenebusanDetail struct {
 	BBM         *BBM   `gorm:"foreignKey:BBMID" json:"bbm,omitempty"`
 
 	// Volume — disimpan sebagai integer × 10^stock_decimal_places
-	JmlLiter int64 `gorm:"type:bigint;not null" json:"jml_liter"`
+	JmlLiter    int64 `gorm:"type:bigint;not null" json:"jml_liter"`
+	QtyTerkirim int64 `gorm:"type:bigint;not null;default:0" json:"qty_terkirim"` // total liter sudah terkirim dari Pertamina
 
 	// Harga snapshot (Rp per liter, integer)
 	HargaDasar int64 `gorm:"type:bigint;not null" json:"harga_dasar"`      // harga beli dari Pertamina

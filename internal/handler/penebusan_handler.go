@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"html/template"
+	"log"
 	"math"
 	"net/http"
 	"strconv"
@@ -229,6 +230,14 @@ func (h *PenebusanHandler) Create(c *gin.Context) {
 			return
 		}
 
+		// Post (or re-post) journal when document is Complete.
+		if trx.Status == entity.PenebusanComplete {
+			createdBy := extractUserID(c)
+			if err := h.service.PostJournal(&trx, createdBy); err != nil {
+				log.Printf("[penebusan] PostJournal update id=%d: %v", trx.ID, err)
+			}
+		}
+
 		c.JSON(http.StatusOK, gin.H{
 			"status":       true,
 			"message":      "Penebusan berhasil diperbarui",
@@ -242,6 +251,14 @@ func (h *PenebusanHandler) Create(c *gin.Context) {
 	if err := h.service.Create(&trx); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"status": false, "message": "Gagal menyimpan penebusan"})
 		return
+	}
+
+	// Post journal for newly created Complete documents.
+	if trx.Status == entity.PenebusanComplete {
+		createdBy := extractUserID(c)
+		if err := h.service.PostJournal(&trx, createdBy); err != nil {
+			log.Printf("[penebusan] PostJournal create id=%d: %v", trx.ID, err)
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -266,7 +283,20 @@ func (h *PenebusanHandler) Delete(c *gin.Context) {
 		return
 	}
 
+	// Reverse journal entries linked to this document.
+	if err := h.service.ReverseJournal(id); err != nil {
+		log.Printf("[penebusan] ReverseJournal id=%d: %v", id, err)
+	}
+
 	c.JSON(http.StatusOK, gin.H{"status": true, "message": "Penebusan berhasil dihapus"})
+}
+
+// extractUserID pulls the logged-in user's ID from the Gin context (set by AuthRequired middleware).
+func extractUserID(c *gin.Context) *uint {
+	if u, ok := c.MustGet("user").(*entity.User); ok {
+		return &u.ID
+	}
+	return nil
 }
 
 // GetDetail — returns header + detail lines for a single penebusan (AJAX)
@@ -424,4 +454,89 @@ func formatDatePtr(t *time.Time) string {
 		return ""
 	}
 	return t.Format("2006-01-02")
+}
+
+// ── StokDO ───────────────────────────────────────────────────────────────────
+
+// StokDORow adalah baris tampilan halaman Stok DO (pengiriman per SO per BBM).
+type StokDORow struct {
+	DetailID     uint64
+	PenebusanID  uint64
+	NoPenebusan  string
+	NoSO         string
+	TglPenebusan string
+	JenisBBM     string
+	JmlLiter     int64
+	QtyTerkirim  int64
+	SisaLiter    int64
+	StatusKirim  string // "Belum" | "Selesai"
+}
+
+// StokDOIndex — halaman tracking pengiriman BBM per nomor SO.
+func (h *PenebusanHandler) StokDOIndex(c *gin.Context) {
+	user, _ := c.Get("user")
+	favicon, _ := c.Get("favicon")
+
+	summary := h.service.GetStokDOSummary()
+
+	c.HTML(http.StatusOK, "transaction/stok-do/index.html", gin.H{
+		"User":       user,
+		"Favicon":    favicon,
+		"Title":      "Stok DO — Tracking Pengiriman BBM",
+		"ActiveMenu": "stok-do",
+		"Summary":    summary,
+	})
+}
+
+// StokDODatatable — server-side DataTables endpoint untuk halaman Stok DO.
+// POST /transaction/stok-do/datatable
+func (h *PenebusanHandler) StokDODatatable(c *gin.Context) {
+	var req dto.DatatableRequest
+	if err := c.ShouldBind(&req); err != nil {
+		c.JSON(http.StatusBadRequest, dto.DatatableResponse{Error: err.Error()})
+		return
+	}
+	total, filtered, rows, err := h.service.DatatableStokDO(req)
+	if err != nil {
+		log.Printf("[StokDODatatable] error: %v", err)
+		c.JSON(http.StatusInternalServerError, dto.DatatableResponse{Error: "Gagal memuat data"})
+		return
+	}
+	c.JSON(http.StatusOK, dto.DatatableResponse{
+		Draw:            req.Draw,
+		RecordsTotal:    total,
+		RecordsFiltered: filtered,
+		Data:            rows,
+	})
+}
+
+// UpdateDetailQty — update qty_terkirim untuk satu detail baris.
+// POST /transaction/stok-do/:detail_id/qty
+func (h *PenebusanHandler) UpdateDetailQty(c *gin.Context) {
+	rawID := c.Param("detail_id")
+	detailID, err := strconv.ParseUint(rawID, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "ID tidak valid"})
+		return
+	}
+
+	var body struct {
+		QtyTerkirim int64 `json:"qty_terkirim" form:"qty_terkirim"`
+	}
+	if err := c.ShouldBind(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Data tidak valid"})
+		return
+	}
+	if body.QtyTerkirim < 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "QTY terkirim tidak boleh negatif"})
+		return
+	}
+
+	if err := h.service.UpdateQtyTerkirim(detailID, body.QtyTerkirim); err != nil {
+		log.Printf("[UpdateDetailQty] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal menyimpan data"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "ok", "message": "QTY terkirim berhasil disimpan"})
 }

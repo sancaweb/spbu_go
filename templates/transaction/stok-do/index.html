@@ -1,0 +1,414 @@
+{{ define "transaction/stok-do/index.html" }} {{ template "header.html" . }}
+
+<div x-data="stokDOPage()" x-init="init()" class="space-y-5">
+  <!-- Page Title -->
+  <div
+    class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
+  >
+    <div>
+      <h2 class="text-2xl font-bold text-slate-800">{{ .Title }}</h2>
+      <p class="text-slate-500 text-sm mt-1">
+        Pemantauan realisasi pengiriman BBM dari Pertamina berdasarkan nomor SO
+      </p>
+    </div>
+    <a
+      href="/transaction/penebusan"
+      class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg text-sm font-medium transition"
+    >
+      <svg
+        class="w-4 h-4"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M15 19l-7-7 7-7"
+        />
+      </svg>
+      Kembali ke Penebusan
+    </a>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div class="glass-card rounded-2xl p-4">
+      <p
+        class="text-xs text-slate-400 uppercase font-semibold tracking-wide mb-1"
+      >
+        Total SO
+      </p>
+      <p class="text-2xl font-bold text-slate-800">{{ .Summary.TotalSO }}</p>
+    </div>
+    <div class="glass-card rounded-2xl p-4">
+      <p
+        class="text-xs text-slate-400 uppercase font-semibold tracking-wide mb-1"
+      >
+        Total Item BBM
+      </p>
+      <p class="text-2xl font-bold text-[#005596]">{{ .Summary.TotalItems }}</p>
+    </div>
+    <div class="glass-card rounded-2xl p-4">
+      <p
+        class="text-xs text-slate-400 uppercase font-semibold tracking-wide mb-1"
+      >
+        Selesai Terkirim
+      </p>
+      <p class="text-2xl font-bold text-green-700">{{ .Summary.Selesai }}</p>
+    </div>
+    <div class="glass-card rounded-2xl p-4">
+      <p
+        class="text-xs text-slate-400 uppercase font-semibold tracking-wide mb-1"
+      >
+        Belum Selesai
+      </p>
+      <p class="text-2xl font-bold text-amber-600">{{ .Summary.Belum }}</p>
+    </div>
+  </div>
+
+  <!-- Table Card -->
+  <div class="glass-card rounded-2xl overflow-hidden">
+    <!-- Card Header -->
+    <div
+      class="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-3"
+    >
+      <div class="flex items-center gap-3">
+        <div
+          class="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center"
+        >
+          <svg
+            class="w-5 h-5 text-[#005596]"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+            />
+          </svg>
+        </div>
+        <div>
+          <h3 class="text-base font-semibold text-slate-800">
+            Daftar Pengiriman per Nomor SO
+          </h3>
+          <p class="text-xs text-slate-400">
+            Klik nomor SO untuk melihat detail penebusan
+          </p>
+        </div>
+      </div>
+      <select
+        id="filter-status"
+        class="text-xs border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400"
+      >
+        <option value="">Semua Status</option>
+        <option value="Belum">Belum Selesai</option>
+        <option value="Selesai">Selesai</option>
+      </select>
+    </div>
+
+    <style>
+      .dataTables_wrapper .dataTables_length select,
+      .dataTables_wrapper .dataTables_filter input {
+        border: 1px solid #cbd5e1;
+        border-radius: 0.5rem;
+        padding: 0.25rem 0.5rem;
+        outline: none;
+        font-size: 0.875rem;
+      }
+      .dataTables_wrapper .dataTables_filter input:focus,
+      .dataTables_wrapper .dataTables_length select:focus {
+        border-color: #005596;
+        box-shadow: 0 0 0 2px rgba(0, 85, 150, 0.15);
+      }
+      .dataTables_wrapper .dataTables_info {
+        font-size: 0.8rem;
+        color: #94a3b8;
+        padding-top: 0.75rem;
+      }
+      .dataTables_wrapper .dataTables_paginate .paginate_button.current,
+      .dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
+        background: #005596 !important;
+        color: white !important;
+        border: none;
+        border-radius: 0.5rem;
+      }
+      .dataTables_wrapper .dataTables_paginate .paginate_button {
+        border-radius: 0.5rem;
+        border: none !important;
+      }
+      .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+        background: #f1f5f9 !important;
+        color: #1e293b !important;
+        border: none !important;
+      }
+      #stokDOTable {
+        border-collapse: collapse;
+      }
+      #stokDOTable thead tr {
+        border-bottom: 2px solid #e2e8f0;
+      }
+      #stokDOTable thead th {
+        background: rgba(248, 250, 252, 0.8);
+        color: #64748b;
+        font-weight: 600;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-right: 1px solid #e2e8f0;
+        padding-top: 10px;
+        padding-bottom: 10px;
+      }
+      #stokDOTable thead th:last-child {
+        border-right: none;
+      }
+      #stokDOTable tbody tr {
+        transition: background-color 0.15s ease;
+        border-bottom: 1px solid #f1f5f9;
+      }
+      #stokDOTable tbody tr:last-child {
+        border-bottom: none;
+      }
+      #stokDOTable tbody tr:hover {
+        background-color: rgba(248, 250, 252, 0.8);
+      }
+      #stokDOTable tbody td {
+        border-right: 1px solid #f1f5f9;
+      }
+      #stokDOTable tbody td:last-child {
+        border-right: none;
+      }
+      .no-so-link {
+        color: #005596;
+        font-weight: 700;
+        font-family: monospace;
+        cursor: pointer;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+        font-size: 0.8rem;
+      }
+      .no-so-link:hover {
+        color: #1d4ed8;
+      }
+    </style>
+
+    <div class="p-4">
+      <table id="stokDOTable" class="w-full text-sm" style="width: 100%">
+        <thead>
+          <tr>
+            <th class="px-4 py-3 text-left">No SO</th>
+            <th class="px-4 py-3 text-left">Jenis BBM</th>
+            <th class="px-4 py-3 text-right">Jumlah Liter</th>
+            <th class="px-4 py-3 text-right">QTY Terkirim (L)</th>
+            <th class="px-4 py-3 text-right">Sisa Liter</th>
+            <th class="px-4 py-3 text-center">Status</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Vendors -->
+<link rel="stylesheet" href="/static/vendor/jquery.dataTables.min.css" />
+<script src="/static/vendor/jquery-3.7.1.min.js"></script>
+<script src="/static/vendor/jquery.dataTables.min.js"></script>
+<script src="/static/vendor/sweetalert2.all.min.js"></script>
+
+<script>
+  function _fmtDate(str) {
+    if (!str) return "—";
+    const d = new Date(str + "T00:00:00");
+    return d.toLocaleDateString("id-ID", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  }
+  function _fmtRp(val) {
+    return Number(val || 0).toLocaleString("id-ID");
+  }
+  function _escapeHtml(str) {
+    return String(str || "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+
+  async function _viewPenebusan(id) {
+    try {
+      const res = await fetch(`/transaction/penebusan/${id}/detail`);
+      if (!res.ok) throw new Error("Gagal memuat detail penebusan");
+      const data = await res.json();
+      const h = data.header || {};
+      const details = data.details || [];
+      const statusLabel = h.status === "CO" ? "Complete" : "Draft";
+      const statusCss =
+        h.status === "CO"
+          ? "background:#ecfdf5;color:#166534;border:1px solid #bbf7d0;"
+          : "background:#f8fafc;color:#475569;border:1px solid #e2e8f0;";
+      const rows = details
+        .map(
+          (d, i) => `<tr>
+      <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:center;">${i + 1}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;">${_escapeHtml(d.bbm_name || "-")}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">${_fmtRp(d.jml_liter)} L</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">Rp ${_fmtRp(d.subtotal)}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">Rp ${_fmtRp(d.ppn_rp)}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">Rp ${_fmtRp(d.total)}</td>
+    </tr>`,
+        )
+        .join("");
+      const html = `
+      <div style="text-align:left;font-size:12px;color:#334155;line-height:1.35;">
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;align-items:center;">
+          <span style="padding:4px 9px;border-radius:999px;background:#eef2ff;color:#1e3a8a;font-weight:700;border:1px solid #c7d2fe;">${_escapeHtml(h.no_penebusan || "-")}</span>
+          <span style="padding:4px 9px;border-radius:999px;font-weight:700;${statusCss}">${_escapeHtml(statusLabel)}</span>
+          <span style="padding:4px 9px;border-radius:999px;background:#f8fafc;color:#475569;border:1px solid #e2e8f0;">${_fmtDate(h.tgl_penebusan)}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 10px;margin-bottom:10px;padding:10px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;">
+          <div><span style="color:#94a3b8;">No SO:</span> <b>${_escapeHtml(h.no_so || "-")}</b></div>
+          <div><span style="color:#94a3b8;">Wallet:</span> <b>${_escapeHtml(h.wallet_name || "-")}</b></div>
+          <div><span style="color:#94a3b8;">Tgl Bayar:</span> <b>${h.tgl_bayar ? _fmtDate(h.tgl_bayar) : "-"}</b></div>
+          <div><span style="color:#94a3b8;">Adm Bank:</span> <b>Rp ${_fmtRp(h.adm_bank)}</b></div>
+        </div>
+        <div style="margin-bottom:10px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;">
+          <span style="color:#94a3b8;">Catatan:</span> ${_escapeHtml(h.catatan || "-")}
+        </div>
+        <div style="overflow:auto;max-height:250px;border:1px solid #e2e8f0;border-radius:10px;">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead style="position:sticky;top:0;background:#f8fafc;">
+              <tr>
+                <th style="padding:8px;text-align:center;">#</th>
+                <th style="padding:8px;text-align:left;">BBM</th>
+                <th style="padding:8px;text-align:right;">Liter</th>
+                <th style="padding:8px;text-align:right;">Subtotal</th>
+                <th style="padding:8px;text-align:right;">Pajak</th>
+                <th style="padding:8px;text-align:right;">Total</th>
+              </tr>
+            </thead>
+            <tbody>${rows || '<tr><td colspan="6" style="padding:12px;text-align:center;color:#94a3b8;">Tidak ada detail</td></tr>'}</tbody>
+          </table>
+        </div>
+        <div style="margin-top:10px;display:flex;justify-content:flex-end;">
+          <span style="padding:7px 10px;border-radius:10px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;font-weight:700;">
+            Total Bayar: Rp ${_fmtRp(h.total_bayar)}
+          </span>
+        </div>
+      </div>`;
+      Swal.fire({
+        title: "Detail Penebusan",
+        html,
+        width: 900,
+        confirmButtonText: "Tutup",
+        confirmButtonColor: "#005596",
+      });
+    } catch (e) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: e.message || "Gagal memuat detail",
+      });
+    }
+  }
+
+  document.addEventListener("alpine:init", () => {
+    Alpine.data("stokDOPage", () => ({
+      init() {
+        this.$nextTick(() => {
+          this.initDataTable();
+        });
+      },
+      initDataTable() {
+        if ($.fn.DataTable.isDataTable("#stokDOTable")) {
+          $("#stokDOTable").DataTable().destroy();
+        }
+        const table = $("#stokDOTable").DataTable({
+          serverSide: true,
+          processing: true,
+          ajax: {
+            url: "/transaction/stok-do/datatable",
+            type: "POST",
+            error: function (xhr, err) {
+              console.error("DataTables AJAX error:", err, xhr.responseText);
+            },
+          },
+          language: {
+            search: "Cari:",
+            lengthMenu: "Tampilkan _MENU_ data",
+            info: "Menampilkan _START_–_END_ dari _TOTAL_ data",
+            infoEmpty: "Tidak ada data",
+            infoFiltered: "(disaring dari _MAX_ total data)",
+            zeroRecords: "Tidak ada data yang sesuai",
+            emptyTable: "Belum ada data penebusan dengan nomor SO",
+            paginate: { previous: "‹", next: "›" },
+            processing: "Memuat data...",
+          },
+          pageLength: 25,
+          order: [[0, "asc"]],
+          columns: [
+            {
+              data: "no_so",
+              className: "px-4 py-3",
+              render: function (d, t, row) {
+                return `<span class="no-so-link" onclick="_viewPenebusan(${row.penebusan_id})">${d || "-"}</span>`;
+              },
+            },
+            {
+              data: "jenis_bbm",
+              className: "px-4 py-3 font-medium text-slate-800",
+            },
+            {
+              data: "jml_liter",
+              className: "px-4 py-3 text-right font-mono text-slate-700",
+              render: function (d) {
+                return Number(d || 0).toLocaleString("id-ID");
+              },
+            },
+            {
+              data: "qty_terkirim",
+              className:
+                "px-4 py-3 text-right font-mono font-semibold text-green-700",
+              render: function (d) {
+                return Number(d || 0).toLocaleString("id-ID");
+              },
+            },
+            {
+              data: "sisa_liter",
+              className: "px-4 py-3 text-right font-mono font-semibold",
+              render: function (d, t, row) {
+                const cls =
+                  row.sisa_liter > 0 ? "text-amber-600" : "text-slate-400";
+                return `<span class="${cls}">${Number(d || 0).toLocaleString("id-ID")}</span>`;
+              },
+            },
+            {
+              data: "status_kirim",
+              orderable: false,
+              className: "px-4 py-3 text-center",
+              render: function (d) {
+                const cls =
+                  d === "Selesai"
+                    ? "bg-green-100 text-green-700"
+                    : "bg-amber-100 text-amber-700";
+                return `<span class="px-2.5 py-1 rounded-full text-xs font-semibold ${cls}">${d}</span>`;
+              },
+            },
+          ],
+        });
+        $("#filter-status").on("change", function () {
+          table.column(5).search(this.value).draw();
+        });
+      },
+    }));
+  });
+</script>
+
+{{ template "footer.html" . }} {{ end }}

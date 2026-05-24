@@ -318,8 +318,11 @@ func main() {
 	)`)
 
 	// Ensure named unique constraint for trx_penebusan.no_penebusan
+	// Guard against both pg_constraint (CONSTRAINT) and pg_class (INDEX) to avoid
+	// "relation already exists" when GORM AutoMigrate created a unique index first.
 	database.DB.Exec(`DO $$ BEGIN
-		IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uni_trx_penebusan_no_penebusan') THEN
+		IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uni_trx_penebusan_no_penebusan')
+		   AND NOT EXISTS (SELECT 1 FROM pg_class WHERE relname = 'uni_trx_penebusan_no_penebusan') THEN
 			IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'trx_penebusan_no_penebusan_key') THEN
 				ALTER TABLE trx_penebusan RENAME CONSTRAINT trx_penebusan_no_penebusan_key TO uni_trx_penebusan_no_penebusan;
 			ELSE
@@ -395,6 +398,36 @@ func main() {
 		updated_at      TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP
 	)`)
 
+	// Add qty_terkirim column to trx_penebusan_detail (tracking pengiriman BBM dari Pertamina)
+	database.DB.Exec(`ALTER TABLE trx_penebusan_detail ADD COLUMN IF NOT EXISTS qty_terkirim BIGINT NOT NULL DEFAULT 0`)
+
+	// Create shifts table (master shift kerja)
+	database.DB.Exec(`CREATE TABLE IF NOT EXISTS shifts (
+		id         SERIAL PRIMARY KEY,
+		shift_name VARCHAR(100) NOT NULL,
+		shift_time VARCHAR(50),
+		created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+	)`)
+
+	// Create trx_kedatangan_bbm table
+	database.DB.Exec(`CREATE TABLE IF NOT EXISTS trx_kedatangan_bbm (
+		id_kedatangan_bbm   BIGSERIAL       PRIMARY KEY,
+		penebusan_id        BIGINT          NOT NULL REFERENCES trx_penebusan(id) ON DELETE RESTRICT,
+		penebusan_detail_id BIGINT          NOT NULL REFERENCES trx_penebusan_detail(id) ON DELETE RESTRICT,
+		no_lo               VARCHAR(50)     NOT NULL,
+		tgl_kedatangan      TIMESTAMP       NOT NULL,
+		shift_id            INT             NOT NULL REFERENCES shifts(id) ON DELETE RESTRICT,
+		bbm_id              INT             NOT NULL REFERENCES bbm(id) ON DELETE RESTRICT,
+		jml_liter           BIGINT          NOT NULL DEFAULT 0,
+		nama_driver         VARCHAR(100),
+		no_pol              VARCHAR(20),
+		created             TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated             TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		created_by          INT             NULL REFERENCES users(id) ON DELETE SET NULL,
+		updated_by          INT             NULL REFERENCES users(id) ON DELETE SET NULL
+	)`)
+
 	log.Println("Manual migration completed")
 
 	// Auto Migrate (enabled for easier setup)
@@ -420,6 +453,8 @@ func main() {
 		&entity.COAMapping{},
 		&entity.TrxPenebusan{},
 		&entity.TrxPenebusanDetail{},
+		&entity.Shift{},
+		&entity.TrxKedatanganBBM{},
 	); err != nil {
 		log.Fatalf("Gagal melakukan migrasi database: %v", err)
 	}
@@ -466,10 +501,14 @@ func main() {
 	walletService := service.NewWalletService(walletRepo)
 	_ = coaTypeRepo // used internally by coaService via coaRepo
 	coaService := service.NewCOAService(coaRepo, journalRepo)
-	journalService := service.NewJournalService(journalRepo)
-	_ = journalService // will be injected into future transaction handlers
+	// accountingService — modul akuntansi generik, inject ke setiap service transaksi baru.
+	accountingService := service.NewAccountingService(journalRepo, coaMappingRepo)
 	coaMappingService := service.NewCOAMappingService(coaMappingRepo, coaRepo)
-	penebusanService := service.NewPenebusanService(penebusanRepo)
+	penebusanService := service.NewPenebusanService(penebusanRepo, accountingService)
+	shiftRepo := repository.NewShiftRepository(database.DB)
+	shiftService := service.NewShiftService(shiftRepo)
+	kedatanganRepo := repository.NewKedatanganBBMRepository(database.DB)
+	kedatanganService := service.NewKedatanganBBMService(kedatanganRepo)
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(authService)
@@ -488,6 +527,8 @@ func main() {
 	coaHandler := handler.NewCOAHandler(coaService)
 	coaMappingHandler := handler.NewCOAMappingHandler(coaMappingService, coaService)
 	penebusanHandler := handler.NewPenebusanHandler(penebusanService, bbmService, walletService, settingService)
+	shiftHandler := handler.NewShiftHandler(shiftService)
+	kedatanganBBMHandler := handler.NewKedatanganBBMHandler(kedatanganService, shiftService)
 
 	// 5. Setup Router
 	r := server.NewRouter()
@@ -638,6 +679,13 @@ func main() {
 				potongan.POST("/:id", potonganHandler.Update)
 				potongan.POST("/:id/delete", potonganHandler.Delete)
 			}
+			shift := master.Group("/shift")
+			{
+				shift.GET("", shiftHandler.Index)
+				shift.POST("", shiftHandler.Create)
+				shift.POST("/:id", shiftHandler.Update)
+				shift.POST("/:id/delete", shiftHandler.Delete)
+			}
 			keuangan := master.Group("/keuangan")
 			{
 				walletRoutes := keuangan.Group("/wallet")
@@ -672,6 +720,21 @@ func main() {
 			transaction.POST("/penebusan/datatable", penebusanHandler.Datatable)
 			transaction.GET("/penebusan/:id/detail", penebusanHandler.GetDetail)
 			transaction.POST("/penebusan/:id/delete", penebusanHandler.Delete)
+
+			// Kedatangan BBM — pencatatan kedatangan pengiriman dari Pertamina
+			transaction.GET("/kedatangan-bbm", kedatanganBBMHandler.Index)
+			transaction.POST("/kedatangan-bbm/datatable", kedatanganBBMHandler.Datatable)
+			transaction.GET("/kedatangan-bbm/so-options", kedatanganBBMHandler.GetSOOptions)
+			transaction.GET("/kedatangan-bbm/so/:penebusan_id/bbm", kedatanganBBMHandler.GetBBMByPenebusan)
+			transaction.GET("/kedatangan-bbm/:id", kedatanganBBMHandler.GetOne)
+			transaction.POST("/kedatangan-bbm", kedatanganBBMHandler.Create)
+			transaction.POST("/kedatangan-bbm/:id", kedatanganBBMHandler.Update)
+			transaction.POST("/kedatangan-bbm/:id/delete", kedatanganBBMHandler.Delete)
+
+			// Stok DO — tracking pengiriman BBM per nomor SO
+			transaction.GET("/stok-do", penebusanHandler.StokDOIndex)
+			transaction.POST("/stok-do/datatable", penebusanHandler.StokDODatatable)
+			transaction.POST("/stok-do/:detail_id/qty", penebusanHandler.UpdateDetailQty)
 		}
 	}
 

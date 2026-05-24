@@ -33,6 +33,22 @@ func NewRouter() *gin.Engine {
 			}
 			return neg + result
 		},
+		// add returns a + b (useful for 1-based loop index in templates)
+		"add": func(a, b int) int { return a + b },
+		// progressPct returns integer percentage (0-100) of qty vs total.
+		"progressPct": func(qty, total int64) int {
+			if total <= 0 {
+				return 0
+			}
+			pct := int(qty * 100 / total)
+			if pct > 100 {
+				return 100
+			}
+			if pct < 0 {
+				return 0
+			}
+			return pct
+		},
 	})
 
 	// Static files

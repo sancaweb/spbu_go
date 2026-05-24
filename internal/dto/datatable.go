@@ -33,3 +33,25 @@ type DatatableResponse struct {
 	Data            interface{} `json:"data"`
 	Error           string      `json:"error,omitempty"`
 }
+
+// StokDODTRow — data row untuk server-side datatable Stok DO.
+type StokDODTRow struct {
+	DetailID     uint64 `gorm:"column:detail_id" json:"detail_id"`
+	PenebusanID  uint64 `gorm:"column:penebusan_id" json:"penebusan_id"`
+	NoPenebusan  string `gorm:"column:no_penebusan" json:"no_penebusan"`
+	NoSO         string `gorm:"column:no_so" json:"no_so"`
+	TglPenebusan string `gorm:"column:tgl_penebusan" json:"tgl_penebusan"`
+	JenisBBM     string `gorm:"column:jenis_bbm" json:"jenis_bbm"`
+	JmlLiter     int64  `gorm:"column:jml_liter" json:"jml_liter"`
+	QtyTerkirim  int64  `gorm:"column:qty_terkirim" json:"qty_terkirim"`
+	SisaLiter    int64  `gorm:"column:sisa_liter" json:"sisa_liter"`
+	StatusKirim  string `gorm:"column:status_kirim" json:"status_kirim"`
+}
+
+// StokDOSummary — ringkasan statistik untuk halaman Stok DO.
+type StokDOSummary struct {
+	TotalSO    int64 `gorm:"column:total_so"`
+	TotalItems int64 `gorm:"column:total_items"`
+	Selesai    int64 `gorm:"column:selesai"`
+	Belum      int64 `gorm:"column:belum"`
+}

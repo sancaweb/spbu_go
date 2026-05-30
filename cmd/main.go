@@ -428,6 +428,39 @@ func main() {
 		updated_by          INT             NULL REFERENCES users(id) ON DELETE SET NULL
 	)`)
 
+	// Create trx_penjualan table (header penjualan BBM per shift)
+	database.DB.Exec(`CREATE TABLE IF NOT EXISTS trx_penjualan (
+		id_penjualan            BIGSERIAL       PRIMARY KEY,
+		no_penjualan            VARCHAR(25)     NOT NULL,
+		shift_id                INT             NOT NULL REFERENCES shifts(id) ON DELETE RESTRICT,
+		waktu_mulai             TIMESTAMP       NOT NULL,
+		waktu_akhir             TIMESTAMP       NOT NULL,
+		total_rp_totalisator    BIGINT          NOT NULL DEFAULT 0,
+		total_penerimaan        BIGINT          NOT NULL DEFAULT 0,
+		aktual_uang             BIGINT          NOT NULL DEFAULT 0,
+		selisih                 BIGINT          NOT NULL DEFAULT 0,
+		created                 TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		created_by              INT             NULL REFERENCES users(id) ON DELETE SET NULL,
+		updated                 TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_by              INT             NULL REFERENCES users(id) ON DELETE SET NULL,
+		CONSTRAINT uni_trx_penjualan_no_penjualan UNIQUE (no_penjualan)
+	)`)
+
+	// Create trx_penjualan_detail table (detail per nozzle)
+	database.DB.Exec(`CREATE TABLE IF NOT EXISTS trx_penjualan_detail (
+		detail_penjualan_id BIGSERIAL   PRIMARY KEY,
+		penjualan_id        BIGINT      NOT NULL REFERENCES trx_penjualan(id_penjualan) ON DELETE CASCADE,
+		tiang_id            INT         NOT NULL REFERENCES tiang(id) ON DELETE RESTRICT,
+		nozzle_id           INT         NOT NULL REFERENCES nozzles(id) ON DELETE RESTRICT,
+		bbm_id              INT         NOT NULL REFERENCES bbm(id) ON DELETE RESTRICT,
+		bbm_price           BIGINT      NOT NULL DEFAULT 0,
+		margin              BIGINT      NOT NULL DEFAULT 0,
+		totalisator_awal    BIGINT      NOT NULL DEFAULT 0,
+		totalisator_akhir   BIGINT      NOT NULL DEFAULT 0,
+		jml_liter           BIGINT      NOT NULL DEFAULT 0,
+		jml_rupiah          BIGINT      NOT NULL DEFAULT 0
+	)`)
+
 	log.Println("Manual migration completed")
 
 	// Auto Migrate (enabled for easier setup)
@@ -455,6 +488,8 @@ func main() {
 		&entity.TrxPenebusanDetail{},
 		&entity.Shift{},
 		&entity.TrxKedatanganBBM{},
+		&entity.TrxPenjualan{},
+		&entity.TrxPenjualanDetail{},
 	); err != nil {
 		log.Fatalf("Gagal melakukan migrasi database: %v", err)
 	}
@@ -529,6 +564,9 @@ func main() {
 	penebusanHandler := handler.NewPenebusanHandler(penebusanService, bbmService, walletService, settingService)
 	shiftHandler := handler.NewShiftHandler(shiftService)
 	kedatanganBBMHandler := handler.NewKedatanganBBMHandler(kedatanganService, shiftService)
+	penjualanRepo := repository.NewPenjualanRepository(database.DB)
+	penjualanService := service.NewPenjualanService(penjualanRepo, accountingService)
+	penjualanHandler := handler.NewPenjualanHandler(penjualanService, tiangService, shiftService, settingService)
 
 	// 5. Setup Router
 	r := server.NewRouter()
@@ -730,6 +768,16 @@ func main() {
 			transaction.POST("/kedatangan-bbm", kedatanganBBMHandler.Create)
 			transaction.POST("/kedatangan-bbm/:id", kedatanganBBMHandler.Update)
 			transaction.POST("/kedatangan-bbm/:id/delete", kedatanganBBMHandler.Delete)
+
+			// Penjualan BBM — transaksi penjualan harian per shift
+			transaction.GET("/penjualan", penjualanHandler.Index)
+			transaction.POST("/penjualan/datatable", penjualanHandler.Datatable)
+			transaction.GET("/penjualan/create", penjualanHandler.FormCreate)
+			transaction.POST("/penjualan", penjualanHandler.Create)
+			transaction.GET("/penjualan/:id/edit", penjualanHandler.FormEdit)
+			transaction.GET("/penjualan/:id/detail", penjualanHandler.GetDetail)
+			transaction.POST("/penjualan/:id", penjualanHandler.Update)
+			transaction.POST("/penjualan/:id/delete", penjualanHandler.Delete)
 
 			// Stok DO — tracking pengiriman BBM per nomor SO
 			transaction.GET("/stok-do", penebusanHandler.StokDOIndex)

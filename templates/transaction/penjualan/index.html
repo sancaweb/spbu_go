@@ -1,0 +1,390 @@
+{{ define "transaction/penjualan/index.html" }} {{ template "header.html" . }}
+
+<div class="p-4 md:p-6">
+  <!-- ── Page Header ───────────────────────────────────────────────────── -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-800">Penjualan BBM</h1>
+      <p class="text-sm text-gray-500 mt-1">
+        Pencatatan penjualan harian per shift
+      </p>
+    </div>
+    <a
+      href="/transaction/penjualan/create"
+      class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg shadow transition"
+    >
+      <i class="fas fa-plus"></i> Buat Penjualan
+    </a>
+  </div>
+
+  <!-- ── DataTable Card ────────────────────────────────────────────────── -->
+  <div
+    class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
+  >
+    <div class="overflow-x-auto">
+      <table
+        id="tbl-penjualan"
+        class="w-full text-sm text-left text-gray-700"
+        style="width: 100%"
+      >
+        <thead
+          class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider"
+        >
+          <tr>
+            <th class="px-4 py-3 w-10 text-center">#</th>
+            <th class="px-4 py-3">No. Form</th>
+            <th class="px-4 py-3">Tanggal</th>
+            <th class="px-4 py-3">Shift</th>
+            <th class="px-4 py-3 text-right">Total Totalisator</th>
+            <th class="px-4 py-3 text-right">Total Penerimaan</th>
+            <th class="px-4 py-3 text-right">Aktual Uang</th>
+            <th class="px-4 py-3 text-right">Selisih</th>
+            <th class="px-4 py-3 text-center">Aksi</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── Detail Modal ──────────────────────────────────────────────────────── -->
+<div id="detail-modal" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/40" onclick="closeDetailModal()"></div>
+  <div
+    class="relative z-10 flex items-start justify-center min-h-screen pt-16 px-4"
+  >
+    <div
+      class="bg-white rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden"
+    >
+      <div class="flex items-center justify-between px-6 py-4 border-b">
+        <h3 class="font-semibold text-gray-800 text-lg" id="detail-modal-title">
+          Detail Penjualan
+        </h3>
+        <button
+          onclick="closeDetailModal()"
+          class="text-gray-400 hover:text-gray-600 text-xl"
+        >
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div id="detail-modal-body" class="p-6 max-h-[70vh] overflow-y-auto">
+        <div class="text-center text-gray-400 py-8">
+          <i class="fas fa-spinner fa-spin text-3xl"></i>
+          <p class="mt-2">Memuat data...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── DataTables init ──────────────────────────────────────────────────────────
+  $(function () {
+    var rowNum = 0;
+
+    window._tblPenjualan = $("#tbl-penjualan").DataTable({
+      processing: true,
+      serverSide: true,
+      ajax: {
+        url: "/transaction/penjualan/datatable",
+        type: "POST",
+        data: function (d) {
+          return d;
+        },
+      },
+      columns: [
+        {
+          data: null,
+          orderable: false,
+          searchable: false,
+          render: function (d, t, r, m) {
+            return m.settings._iDisplayStart + m.row + 1;
+          },
+        },
+        {
+          data: "no_penjualan",
+          render: function (v, t, r) {
+            return (
+              '<a href="#" class="text-blue-600 hover:underline font-medium" onclick="loadDetail(' +
+              r.id +
+              ');return false;">' +
+              v +
+              "</a>"
+            );
+          },
+        },
+        {
+          data: "tgl",
+          render: function (v) {
+            return v ? formatTgl(v) : "-";
+          },
+        },
+        { data: "shift_name", defaultContent: "-" },
+        {
+          data: "total_rp_totalisator",
+          className: "text-right",
+          render: function (v) {
+            return "Rp " + formatIDR(v);
+          },
+        },
+        {
+          data: "total_penerimaan",
+          className: "text-right",
+          render: function (v) {
+            return "Rp " + formatIDR(v);
+          },
+        },
+        {
+          data: "aktual_uang",
+          className: "text-right",
+          render: function (v) {
+            return "Rp " + formatIDR(v);
+          },
+        },
+        {
+          data: "selisih",
+          className: "text-right",
+          render: function (v) {
+            var color =
+              v < 0
+                ? "text-red-600"
+                : v > 0
+                  ? "text-yellow-600"
+                  : "text-gray-500";
+            return (
+              '<span class="font-medium ' +
+              color +
+              '">' +
+              (v < 0 ? "-" : "") +
+              "Rp " +
+              formatIDR(Math.abs(v)) +
+              "</span>"
+            );
+          },
+        },
+        {
+          data: "id",
+          orderable: false,
+          searchable: false,
+          className: "text-center",
+          render: function (id, t, r) {
+            return (
+              '<div class="flex items-center justify-center gap-2">' +
+              '<a href="/transaction/penjualan/' +
+              id +
+              '/edit" class="text-blue-500 hover:text-blue-700" title="Edit"><i class="fas fa-pencil-alt"></i></a>' +
+              '<button onclick="deletePenjualan(' +
+              id +
+              ",'" +
+              r.no_penjualan +
+              '\')" class="text-red-500 hover:text-red-700" title="Hapus"><i class="fas fa-trash"></i></button>' +
+              "</div>"
+            );
+          },
+        },
+      ],
+      order: [[2, "desc"]],
+      language: {
+        search: "Cari:",
+        lengthMenu: "Tampilkan _MENU_ data",
+        info: "Data _START_–_END_ dari _TOTAL_",
+        infoEmpty: "Tidak ada data",
+        zeroRecords: "Data tidak ditemukan",
+        paginate: { previous: "‹", next: "›" },
+      },
+      dom: '<"flex flex-wrap items-center justify-between gap-2 px-4 py-3"lf>rt<"flex flex-wrap items-center justify-between gap-2 px-4 py-3"ip>',
+      pageLength: 25,
+    });
+  });
+
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+  function formatTgl(v) {
+    if (!v) return "-";
+    var d = new Date(v + (v.indexOf("T") === -1 ? "T00:00:00" : ""));
+    return (
+      ("0" + d.getDate()).slice(-2) +
+      "/" +
+      ("0" + (d.getMonth() + 1)).slice(-2) +
+      "/" +
+      d.getFullYear()
+    );
+  }
+
+  // ── Detail modal ─────────────────────────────────────────────────────────────
+  function loadDetail(id) {
+    document.getElementById("detail-modal").classList.remove("hidden");
+    document.getElementById("detail-modal-title").textContent =
+      "Detail Penjualan";
+    document.getElementById("detail-modal-body").innerHTML =
+      '<div class="text-center text-gray-400 py-8"><i class="fas fa-spinner fa-spin text-3xl"></i><p class="mt-2">Memuat data...</p></div>';
+
+    fetch("/transaction/penjualan/" + id + "/detail")
+      .then((r) => r.json())
+      .then(function (p) {
+        var html = buildDetailHTML(p);
+        document.getElementById("detail-modal-title").textContent =
+          "Detail — " + (p.no_penjualan || "");
+        document.getElementById("detail-modal-body").innerHTML = html;
+      })
+      .catch(function () {
+        document.getElementById("detail-modal-body").innerHTML =
+          '<p class="text-red-500 text-center py-6">Gagal memuat data.</p>';
+      });
+  }
+
+  function closeDetailModal() {
+    document.getElementById("detail-modal").classList.add("hidden");
+  }
+
+  function buildDetailHTML(p) {
+    var shiftName =
+      p.shift && p.shift.shift_name
+        ? p.shift.shift_name +
+          (p.shift.shift_time ? " (" + p.shift.shift_time + ")" : "")
+        : "-";
+    var formatDT = function (v) {
+      if (!v) return "-";
+      var d = new Date(v);
+      return (
+        ("0" + d.getDate()).slice(-2) +
+        "/" +
+        ("0" + (d.getMonth() + 1)).slice(-2) +
+        "/" +
+        d.getFullYear() +
+        " " +
+        ("0" + d.getHours()).slice(-2) +
+        ":" +
+        ("0" + d.getMinutes()).slice(-2)
+      );
+    };
+
+    var html = '<div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">';
+    html += card("No. Penjualan", p.no_penjualan || "-");
+    html += card("Shift", shiftName);
+    html += card("Waktu Mulai", formatDT(p.waktu_mulai));
+    html += card("Waktu Akhir", formatDT(p.waktu_akhir));
+    html += card(
+      "Total Totalisator",
+      "Rp " + formatIDR(p.total_rp_totalisator),
+    );
+    html += card("Total Penerimaan", "Rp " + formatIDR(p.total_penerimaan));
+    html += card("Aktual Uang", "Rp " + formatIDR(p.aktual_uang));
+    var s = p.selisih || 0;
+    var selColor =
+      s < 0 ? "text-red-600" : s > 0 ? "text-yellow-700" : "text-green-600";
+    html += card(
+      "Selisih",
+      '<span class="' +
+        selColor +
+        ' font-semibold">' +
+        (s < 0 ? "-" : "") +
+        "Rp " +
+        formatIDR(Math.abs(s)) +
+        "</span>",
+    );
+    html += "</div>";
+
+    // Detail nozzle table
+    if (p.details && p.details.length > 0) {
+      html += '<h4 class="font-semibold text-gray-700 mb-2">Detail Nozzle</h4>';
+      html +=
+        '<div class="overflow-x-auto"><table class="w-full text-sm border-collapse">';
+      html +=
+        '<thead><tr class="bg-gray-100 text-gray-600 text-xs uppercase">' +
+        '<th class="px-3 py-2 text-left">Tiang</th>' +
+        '<th class="px-3 py-2 text-left">Nozzle</th>' +
+        '<th class="px-3 py-2 text-left">BBM</th>' +
+        '<th class="px-3 py-2 text-right">Tot. Awal</th>' +
+        '<th class="px-3 py-2 text-right">Tot. Akhir</th>' +
+        '<th class="px-3 py-2 text-right">Jml Liter</th>' +
+        '<th class="px-3 py-2 text-right">Rp/L</th>' +
+        '<th class="px-3 py-2 text-right">Jml Rupiah</th>' +
+        "</tr></thead><tbody>";
+      p.details.forEach(function (d, i) {
+        var rowClass = i % 2 === 0 ? "" : "bg-gray-50";
+        html +=
+          '<tr class="border-t ' +
+          rowClass +
+          '">' +
+          '<td class="px-3 py-2">' +
+          (d.tiang && d.tiang.name ? d.tiang.name : "-") +
+          "</td>" +
+          '<td class="px-3 py-2">' +
+          (d.nozzle && d.nozzle.description ? d.nozzle.description : "-") +
+          "</td>" +
+          '<td class="px-3 py-2">' +
+          (d.bbm && d.bbm.name ? d.bbm.name : "-") +
+          "</td>" +
+          '<td class="px-3 py-2 text-right">' +
+          formatIDR(d.totalisator_awal) +
+          "</td>" +
+          '<td class="px-3 py-2 text-right">' +
+          formatIDR(d.totalisator_akhir) +
+          "</td>" +
+          '<td class="px-3 py-2 text-right font-medium">' +
+          formatIDR(d.jml_liter) +
+          "</td>" +
+          '<td class="px-3 py-2 text-right">' +
+          formatIDR(d.bbm_price) +
+          "</td>" +
+          '<td class="px-3 py-2 text-right font-medium text-blue-700">Rp ' +
+          formatIDR(d.jml_rupiah) +
+          "</td>" +
+          "</tr>";
+      });
+      html += "</tbody></table></div>";
+    }
+
+    return html;
+  }
+
+  function card(label, val) {
+    return (
+      '<div class="bg-gray-50 rounded-lg p-3">' +
+      '<p class="text-xs text-gray-500 uppercase tracking-wide mb-1">' +
+      label +
+      "</p>" +
+      '<p class="font-semibold text-gray-800">' +
+      val +
+      "</p></div>"
+    );
+  }
+
+  // ── Delete ────────────────────────────────────────────────────────────────────
+  function deletePenjualan(id, noForm) {
+    Swal.fire({
+      title: "Hapus Penjualan?",
+      html:
+        "Data <strong>" +
+        noForm +
+        "</strong> akan dihapus permanen termasuk jurnal akuntansi terkait.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#6b7280",
+      confirmButtonText: "Ya, Hapus",
+      cancelButtonText: "Batal",
+    }).then(function (result) {
+      if (!result.isConfirmed) return;
+      fetch("/transaction/penjualan/" + id + "/delete", { method: "POST" })
+        .then((r) => r.json())
+        .then(function (res) {
+          if (res.status === "success") {
+            Swal.fire({
+              icon: "success",
+              title: "Berhasil",
+              text: res.message,
+              timer: 1800,
+              showConfirmButton: false,
+            });
+            window._tblPenjualan.ajax.reload(null, false);
+          } else {
+            Swal.fire({ icon: "error", title: "Gagal", text: res.message });
+          }
+        });
+    });
+  }
+</script>
+
+{{ template "footer.html" . }} {{ end }}

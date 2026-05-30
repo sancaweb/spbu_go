@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html/template"
 	"path/filepath"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -48,6 +49,13 @@ func NewRouter() *gin.Engine {
 				return 0
 			}
 			return pct
+		},
+		// formatWaktu formats a time.Time as "2006-01-02T15:04" for datetime-local inputs.
+		"formatWaktu": func(t time.Time) string {
+			if t.IsZero() {
+				return ""
+			}
+			return t.Format("2006-01-02T15:04")
 		},
 	})
 

@@ -55,3 +55,17 @@ type StokDOSummary struct {
 	Selesai    int64 `gorm:"column:selesai"`
 	Belum      int64 `gorm:"column:belum"`
 }
+
+// PenjualanDTRow — data row untuk server-side datatable Penjualan BBM.
+type PenjualanDTRow struct {
+	ID                 uint64 `gorm:"column:id" json:"id"`
+	NoPenjualan        string `gorm:"column:no_penjualan" json:"no_penjualan"`
+	Tgl                string `gorm:"column:tgl" json:"tgl"`
+	WaktuMulai         string `gorm:"column:waktu_mulai" json:"waktu_mulai"`
+	WaktuAkhir         string `gorm:"column:waktu_akhir" json:"waktu_akhir"`
+	ShiftName          string `gorm:"column:shift_name" json:"shift_name"`
+	TotalRpTotalisator int64  `gorm:"column:total_rp_totalisator" json:"total_rp_totalisator"`
+	TotalPenerimaan    int64  `gorm:"column:total_penerimaan" json:"total_penerimaan"`
+	AktualUang         int64  `gorm:"column:aktual_uang" json:"aktual_uang"`
+	Selisih            int64  `gorm:"column:selisih" json:"selisih"`
+}

@@ -1,0 +1,441 @@
+{{ define "transaction/penjualan/form.html" }} {{ template "header.html" . }}
+
+<!-- ── Embedded nozzle data ──────────────────────────────────────────────── -->
+<script type="application/json" id="nozzle-data">
+  {{ .NozzleRows }}
+</script>
+
+<div
+  class="p-4 md:p-6 max-w-7xl mx-auto"
+  x-data="penjualanForm()"
+  x-init="init()"
+>
+  <!-- ── Page header ──────────────────────────────────────────────────────── -->
+  <div class="flex items-center gap-3 mb-6">
+    <a
+      href="/transaction/penjualan"
+      class="text-gray-500 hover:text-gray-700 transition"
+    >
+      <i class="fas fa-arrow-left"></i>
+    </a>
+    <div>
+      <h1 class="text-2xl font-bold text-gray-800">
+        {{ if .IsEdit }}Edit Penjualan BBM{{ else }}Buat Penjualan BBM{{ end }}
+      </h1>
+      {{ if .IsEdit }}
+      <p class="text-sm text-gray-500 mt-0.5">
+        No.
+        <span class="font-medium text-gray-700"
+          >{{ .Penjualan.NoPenjualan }}</span
+        >
+      </p>
+      {{ end }}
+    </div>
+  </div>
+
+  <!-- ── Header Form ──────────────────────────────────────────────────────── -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+    <h2 class="font-semibold text-gray-700 mb-4 flex items-center gap-2">
+      <i class="fas fa-info-circle text-blue-500"></i> Informasi Shift
+    </h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <!-- Shift -->
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">
+          Shift <span class="text-red-500">*</span>
+        </label>
+        <select
+          x-model.number="form.shift_id"
+          class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+        >
+          <option value="">-- Pilih Shift --</option>
+          {{ range .Shifts }}
+          <option value="{{ .ID }}">
+            {{ .ShiftName }}{{ if .ShiftTime }} ({{ .ShiftTime }}){{ end }}
+          </option>
+          {{ end }}
+        </select>
+      </div>
+
+      <!-- Waktu Mulai -->
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">
+          Waktu Mulai <span class="text-red-500">*</span>
+        </label>
+        <input
+          type="datetime-local"
+          x-model="form.waktu_mulai"
+          class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+          {{
+          if
+          .IsEdit
+          }}
+          value="{{ if .Penjualan }}{{ formatWaktu .Penjualan.WaktuMulai }}{{ end }}"
+          {{
+          end
+          }}
+        />
+      </div>
+
+      <!-- Waktu Akhir -->
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">
+          Waktu Akhir <span class="text-red-500">*</span>
+        </label>
+        <input
+          type="datetime-local"
+          x-model="form.waktu_akhir"
+          class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+          {{
+          if
+          .IsEdit
+          }}
+          value="{{ if .Penjualan }}{{ formatWaktu .Penjualan.WaktuAkhir }}{{ end }}"
+          {{
+          end
+          }}
+        />
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Detail Nozzle Table ──────────────────────────────────────────────── -->
+  <div
+    class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 overflow-hidden"
+  >
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+      <h2 class="font-semibold text-gray-700 flex items-center gap-2">
+        <i class="fas fa-gas-pump text-blue-500"></i>
+        Data Totalisator Nozzle
+      </h2>
+      <span class="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded">
+        Isi kolom Totalisator Awal &amp; Akhir untuk nozzle yang beroperasi
+      </span>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead
+          class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider"
+        >
+          <tr>
+            <th class="px-3 py-3 text-left w-28">Tiang</th>
+            <th class="px-3 py-3 text-left w-20">Nozzle</th>
+            <th class="px-3 py-3 text-left">BBM</th>
+            <th class="px-3 py-3 text-right w-36">Harga / L</th>
+            <th class="px-3 py-3 text-right w-36">Tot. Awal</th>
+            <th class="px-3 py-3 text-right w-36">Tot. Akhir</th>
+            <th class="px-3 py-3 text-right w-32">Jml Liter</th>
+            <th class="px-3 py-3 text-right w-40">Jml Rupiah</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="(row, idx) in rows" :key="row.nozzle_id">
+            <tr
+              :class="idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'"
+              class="border-t border-gray-100"
+            >
+              <td class="px-3 py-2 text-gray-600" x-text="row.tiang_name"></td>
+              <td class="px-3 py-2">
+                <span
+                  class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-semibold text-xs"
+                  x-text="row.description"
+                ></span>
+              </td>
+              <td class="px-3 py-2">
+                <span
+                  class="text-gray-800 font-medium"
+                  x-text="row.bbm_name"
+                ></span>
+              </td>
+              <td class="px-3 py-2 text-right text-gray-600">
+                Rp <span x-text="formatIDR(row.bbm_price)"></span>
+              </td>
+              <td class="px-3 py-2">
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  x-model.number="row.totalisator_awal"
+                  @input="calcRow(idx)"
+                  class="w-full border border-gray-200 rounded px-2 py-1 text-right text-sm focus:outline-none focus:ring-1 focus:ring-blue-300"
+                />
+              </td>
+              <td class="px-3 py-2">
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  x-model.number="row.totalisator_akhir"
+                  @input="calcRow(idx)"
+                  class="w-full border border-gray-200 rounded px-2 py-1 text-right text-sm focus:outline-none focus:ring-1 focus:ring-blue-300"
+                />
+              </td>
+              <td
+                class="px-3 py-2 text-right font-medium"
+                :class="row.jml_liter < 0 ? 'text-red-600' : 'text-gray-800'"
+                x-text="formatIDR(row.jml_liter)"
+              ></td>
+              <td class="px-3 py-2 text-right font-semibold text-blue-700">
+                Rp <span x-text="formatIDR(row.jml_rupiah)"></span>
+              </td>
+            </tr>
+          </template>
+          <template x-if="rows.length === 0">
+            <tr>
+              <td colspan="8" class="px-4 py-8 text-center text-gray-400">
+                Tidak ada nozzle aktif yang terkonfigurasi
+              </td>
+            </tr>
+          </template>
+        </tbody>
+        <tfoot class="bg-blue-50 font-semibold border-t-2 border-blue-200">
+          <tr>
+            <td
+              colspan="7"
+              class="px-3 py-3 text-right text-gray-700 uppercase text-xs tracking-wide"
+            >
+              Total Penjualan (Totalisator)
+            </td>
+            <td class="px-3 py-3 text-right text-blue-700 text-base">
+              Rp <span x-text="formatIDR(form.total_rp_totalisator)"></span>
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── Rekonsiliasi ─────────────────────────────────────────────────────── -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+    <h2 class="font-semibold text-gray-700 mb-4 flex items-center gap-2">
+      <i class="fas fa-calculator text-green-500"></i> Rekonsiliasi Kas
+    </h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- Total Totalisator (readonly) -->
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1"
+          >Total Penjualan (Totalisator)</label
+        >
+        <div
+          class="w-full border border-gray-100 bg-gray-50 rounded-lg px-3 py-2 text-sm text-right font-semibold text-blue-700"
+        >
+          Rp <span x-text="formatIDR(form.total_rp_totalisator)"></span>
+        </div>
+      </div>
+
+      <!-- Total Penerimaan -->
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1"
+          >Total Penerimaan</label
+        >
+        <input
+          type="text"
+          id="input_total_penerimaan"
+          :value="formatIDR(form.total_penerimaan)"
+          @input="form.total_penerimaan = parseIDR($event.target.value); formatInputIDR($event.target); calcSelisih()"
+          @focus="$event.target.select()"
+          class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-300"
+          placeholder="0"
+        />
+      </div>
+
+      <!-- Aktual Uang -->
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1"
+          >Aktual Uang</label
+        >
+        <input
+          type="text"
+          id="input_aktual_uang"
+          :value="formatIDR(form.aktual_uang)"
+          @input="form.aktual_uang = parseIDR($event.target.value); formatInputIDR($event.target); calcSelisih()"
+          @focus="$event.target.select()"
+          class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-300"
+          placeholder="0"
+        />
+      </div>
+
+      <!-- Selisih (readonly) -->
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1"
+          >Selisih (Aktual − Totalisator)</label
+        >
+        <div
+          class="w-full border rounded-lg px-3 py-2 text-sm text-right font-bold"
+          :class="form.selisih < 0 ? 'border-red-200 bg-red-50 text-red-700' :
+                     form.selisih > 0 ? 'border-yellow-200 bg-yellow-50 text-yellow-700' :
+                                        'border-green-200 bg-green-50 text-green-700'"
+        >
+          <span x-text="form.selisih < 0 ? '-' : ''"></span>Rp
+          <span x-text="formatIDR(Math.abs(form.selisih))"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Actions ──────────────────────────────────────────────────────────── -->
+  <div class="flex items-center justify-end gap-3">
+    <a
+      href="/transaction/penjualan"
+      class="px-5 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-medium transition"
+    >
+      Batal
+    </a>
+    <button
+      @click="submit()"
+      :disabled="isSubmitting"
+      class="px-6 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+    >
+      <i class="fas fa-spinner fa-spin" x-show="isSubmitting"></i>
+      <i class="fas fa-save" x-show="!isSubmitting"></i>
+      <span x-text="isSubmitting ? 'Menyimpan...' : 'Simpan'"></span>
+    </button>
+  </div>
+</div>
+
+<script>
+  (function () {
+    // Nozzle data dari server
+    var _nozzleData = [];
+    try {
+      _nozzleData = JSON.parse(document.getElementById('nozzle-data').textContent || '[]');
+    } catch(e) {}
+
+    // Edit mode: pre-filled header values
+    var _isEdit   = {{ if .IsEdit }}true{{ else }}false{{ end }};
+    var _editID   = {{ if .IsEdit }}{{ if .Penjualan }}{{ .Penjualan.ID }}{{ else }}0{{ end }}{{ else }}0{{ end }};
+    var _shiftID  = {{ if .IsEdit }}{{ if .Penjualan }}{{ .Penjualan.ShiftID }}{{ else }}0{{ end }}{{ else }}0{{ end }};
+    var _totPen   = {{ if .IsEdit }}{{ if .Penjualan }}{{ .Penjualan.TotalPenerimaan }}{{ else }}0{{ end }}{{ else }}0{{ end }};
+    var _aktual   = {{ if .IsEdit }}{{ if .Penjualan }}{{ .Penjualan.AktualUang }}{{ else }}0{{ end }}{{ else }}0{{ end }};
+
+    document.addEventListener('alpine:init', function () {
+      Alpine.data('penjualanForm', function () {
+        return {
+          isSubmitting: false,
+          rows: [],
+          form: {
+            shift_id: _shiftID || '',
+            waktu_mulai: '',
+            waktu_akhir: '',
+            total_penerimaan: _totPen,
+            aktual_uang: _aktual,
+            total_rp_totalisator: 0,
+            selisih: 0 - _totPen /* will recalc */
+          },
+
+          init: function () {
+            var self = this;
+            // Clone nozzle rows from server data
+            self.rows = _nozzleData.map(function (n) {
+              return Object.assign({}, n);
+            });
+            // Initial calcs
+            self.rows.forEach(function (r, i) { self.calcRow(i); });
+            self.calcSelisih();
+
+            // Pre-fill datetime inputs for edit mode
+            if (_isEdit) {
+              var mulaiEl = document.querySelector('input[type="datetime-local"]:nth-of-type(1)');
+              var akhirEl = document.querySelector('input[type="datetime-local"]:nth-of-type(2)');
+              // Values are set via 'value' attribute on the elements already; sync to Alpine model
+              var allDT = document.querySelectorAll('input[type="datetime-local"]');
+              if (allDT[0]) { self.form.waktu_mulai = allDT[0].value; }
+              if (allDT[1]) { self.form.waktu_akhir = allDT[1].value; }
+            }
+          },
+
+          calcRow: function (idx) {
+            var row = this.rows[idx];
+            row.jml_liter  = Math.max(0, (row.totalisator_akhir || 0) - (row.totalisator_awal || 0));
+            row.jml_rupiah = row.jml_liter * (row.bbm_price || 0);
+            this.calcTotal();
+          },
+
+          calcTotal: function () {
+            var total = 0;
+            for (var i = 0; i < this.rows.length; i++) {
+              total += this.rows[i].jml_rupiah || 0;
+            }
+            this.form.total_rp_totalisator = total;
+            this.calcSelisih();
+          },
+
+          calcSelisih: function () {
+            this.form.selisih = (this.form.aktual_uang || 0) - this.form.total_rp_totalisator;
+          },
+
+          validate: function () {
+            if (!this.form.shift_id) return 'Shift harus dipilih';
+            if (!this.form.waktu_mulai) return 'Waktu mulai harus diisi';
+            if (!this.form.waktu_akhir) return 'Waktu akhir harus diisi';
+            var hasData = this.rows.some(function (r) { return r.jml_liter > 0; });
+            if (!hasData) return 'Minimal 1 nozzle harus memiliki data penjualan';
+            return null;
+          },
+
+          buildPayload: function () {
+            var self = this;
+            return {
+              shift_id:         Number(self.form.shift_id),
+              waktu_mulai:      self.form.waktu_mulai,
+              waktu_akhir:      self.form.waktu_akhir,
+              total_penerimaan: self.form.total_penerimaan,
+              aktual_uang:      self.form.aktual_uang,
+              details:          self.rows.map(function (r) {
+                return {
+                  nozzle_id:         r.nozzle_id,
+                  tiang_id:          r.tiang_id,
+                  bbm_id:            r.bbm_id,
+                  bbm_price:         r.bbm_price,
+                  margin:            r.margin,
+                  totalisator_awal:  r.totalisator_awal  || 0,
+                  totalisator_akhir: r.totalisator_akhir || 0
+                };
+              })
+            };
+          },
+
+          submit: function () {
+            var self = this;
+            var err = self.validate();
+            if (err) {
+              Swal.fire({ icon: 'warning', title: 'Periksa Form', text: err });
+              return;
+            }
+            self.isSubmitting = true;
+            var url = _isEdit ? '/transaction/penjualan/' + _editID : '/transaction/penjualan';
+            fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(self.buildPayload())
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+              self.isSubmitting = false;
+              if (res.status === 'success') {
+                Swal.fire({
+                  icon: 'success',
+                  title: 'Berhasil',
+                  text: res.message,
+                  timer: 1600,
+                  showConfirmButton: false
+                }).then(function () {
+                  window.location.href = '/transaction/penjualan';
+                });
+              } else {
+                Swal.fire({ icon: 'error', title: 'Gagal', text: res.message || 'Terjadi kesalahan' });
+              }
+            })
+            .catch(function (e) {
+              self.isSubmitting = false;
+              Swal.fire({ icon: 'error', title: 'Error', text: 'Gagal menghubungi server: ' + e.message });
+            });
+          }
+        };
+      });
+    });
+  })();
+</script>
+
+{{ template "footer.html" . }} {{ end }}

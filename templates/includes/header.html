@@ -190,8 +190,8 @@
             <div class="sidebar-section-title">Master Data</div>
 
             <!-- Employee Sub-menu -->
-            <div x-data="{ empOpen: {{ or (eq .ActiveMenu "master_employee") (eq .ActiveMenu "master_jabatan") (eq .ActiveMenu "master_jabatan_archive") (eq .ActiveMenu "master_pendapatan") (eq .ActiveMenu "master_pendapatan_archive") (eq .ActiveMenu "master_potongan") (eq .ActiveMenu "master_potongan_archive") false }} }">
-                <button @click="empOpen = !empOpen" class="sidebar-link w-full justify-between {{ if or (eq .ActiveMenu "master_employee") (eq .ActiveMenu "master_jabatan") (eq .ActiveMenu "master_jabatan_archive") (eq .ActiveMenu "master_pendapatan") (eq .ActiveMenu "master_pendapatan_archive") (eq .ActiveMenu "master_potongan") (eq .ActiveMenu "master_potongan_archive") }}active{{ end }}">
+            <div x-data="{ empOpen: {{ or (eq .ActiveMenu "master_employee") (eq .ActiveMenu "master_jabatan") (eq .ActiveMenu "master_jabatan_archive") (eq .ActiveMenu "master_pendapatan") (eq .ActiveMenu "master_pendapatan_archive") (eq .ActiveMenu "master_potongan") (eq .ActiveMenu "master_potongan_archive") (eq .ActiveMenu "master_shift") false }} }">
+                <button @click="empOpen = !empOpen" class="sidebar-link w-full justify-between {{ if or (eq .ActiveMenu "master_employee") (eq .ActiveMenu "master_jabatan") (eq .ActiveMenu "master_jabatan_archive") (eq .ActiveMenu "master_pendapatan") (eq .ActiveMenu "master_pendapatan_archive") (eq .ActiveMenu "master_potongan") (eq .ActiveMenu "master_potongan_archive") (eq .ActiveMenu "master_shift") }}active{{ end }}">
                     <div class="flex items-center gap-3">
                         <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
                         Karyawan
@@ -215,6 +215,10 @@
                     <a href="/master/potongan" class="sidebar-link text-sm {{ if eq .ActiveMenu "master_potongan" }}active{{ end }}">
                         <svg class="icon w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         Potongan
+                    </a>
+                    <a href="/master/shift" class="sidebar-link text-sm {{ if eq .ActiveMenu "master_shift" }}active{{ end }}">
+                        <svg class="icon w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Shift
                     </a>
                 </div>
             </div>

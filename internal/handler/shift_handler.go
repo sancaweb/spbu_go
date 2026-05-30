@@ -98,6 +98,19 @@ func (h *ShiftHandler) Delete(c *gin.Context) {
 		return
 	}
 
+	used, err := h.shiftService.IsUsed(uint(id))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": false, "message": "Gagal memeriksa data shift"})
+		return
+	}
+	if used {
+		c.JSON(http.StatusConflict, gin.H{
+			"status":  false,
+			"message": "Shift ini tidak dapat dihapus karena sudah memiliki data transaksi Kedatangan BBM yang terhubung. Hapus terlebih dahulu seluruh transaksi Kedatangan BBM yang menggunakan shift ini, kemudian coba hapus kembali.",
+		})
+		return
+	}
+
 	if err := h.shiftService.Delete(uint(id)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"status": false, "message": "Gagal menghapus shift"})
 		return

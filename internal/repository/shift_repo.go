@@ -12,6 +12,8 @@ type ShiftRepository interface {
 	Create(shift *entity.Shift) error
 	Update(shift *entity.Shift) error
 	Delete(id uint) error
+	// IsUsed returns true jika shift masih dipakai di tabel trx_kedatangan_bbm.
+	IsUsed(id uint) (bool, error)
 }
 
 type shiftRepository struct {
@@ -44,4 +46,10 @@ func (r *shiftRepository) Update(shift *entity.Shift) error {
 
 func (r *shiftRepository) Delete(id uint) error {
 	return r.db.Delete(&entity.Shift{}, id).Error
+}
+
+func (r *shiftRepository) IsUsed(id uint) (bool, error) {
+	var count int64
+	err := r.db.Table("trx_kedatangan_bbm").Where("shift_id = ?", id).Count(&count).Error
+	return count > 0, err
 }

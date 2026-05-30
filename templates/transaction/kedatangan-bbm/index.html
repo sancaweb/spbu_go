@@ -282,9 +282,6 @@
                 required
               />
               <input type="hidden" name="jml_liter" x-model="form.jml_liter" />
-              <p x-show="maxSisa > 0" class="text-xs text-slate-400 mt-1">
-                Maks: <span x-text="formatIDR(maxSisa)"></span> L
-              </p>
             </div>
           </div>
         </div>
@@ -387,11 +384,6 @@
 
       async init() {
         window._kdtgAlpine = this;
-        // Watch perubahan tgl_kedatangan dari sumber manapun → auto-detect shift
-        this.$watch("form.tgl_kedatangan", (val) => {
-          if (val) this.autoDetectShift(val);
-          else this.shiftAutoDetected = false;
-        });
         this.initDatatable();
       },
 
@@ -550,7 +542,7 @@
       },
 
       initFlatpickr() {
-        // Destroy existing instance to avoid duplicate handlers on re-open
+        // Destroy existing instance agar tidak ada duplicate handler saat modal dibuka ulang
         const el = document.querySelector("#tgl_kedatangan_picker");
         if (el && el._flatpickr) el._flatpickr.destroy();
 
@@ -559,55 +551,71 @@
           dateFormat: "Y-m-d H:i",
           time_24hr: true,
           allowInput: true,
+          // onChange: terpicu saat user memilih dari picker (klik kalender / scroll jam)
           onChange: (selectedDates, dateStr) => {
             this.form.tgl_kedatangan = dateStr || "";
+            if (selectedDates.length > 0) {
+              // Gunakan Date object langsung — akurat, tanpa perlu parse string
+              const d = selectedDates[0];
+              this._matchShiftByMinutes(d.getHours() * 60 + d.getMinutes());
+            } else {
+              this.shiftAutoDetected = false;
+            }
           },
-          // onClose menangkap input manual (user ketik langsung lalu blur)
+          // onClose: terpicu saat picker ditutup, termasuk setelah input manual
           onClose: (selectedDates, dateStr) => {
             this.form.tgl_kedatangan = dateStr || "";
+            if (selectedDates.length > 0) {
+              const d = selectedDates[0];
+              this._matchShiftByMinutes(d.getHours() * 60 + d.getMinutes());
+            } else if (dateStr && dateStr.includes(" ")) {
+              // Fallback untuk input manual: parse bagian waktu dari string
+              const timePart = dateStr.split(" ")[1] || "";
+              const [h, m] = timePart.split(":").map(Number);
+              if (!isNaN(h)) this._matchShiftByMinutes(h * 60 + (m || 0));
+            }
           },
         });
       },
 
-      // Baca JSON shift yang di-embed server, lalu cocokkan jam kedatangan
-      autoDetectShift(dateStr) {
-        const shiftData = JSON.parse(
-          document.getElementById("shift-data").textContent || "[]",
-        );
+      // Cocokkan totalMin (0–1439) dengan range shift dari JSON embed
+      _matchShiftByMinutes(totalMin) {
+        const raw = document.getElementById("shift-data");
+        if (!raw) return;
+        let shiftData = [];
+        try {
+          shiftData = JSON.parse(raw.textContent || "[]");
+        } catch (e) {
+          return;
+        }
         if (!shiftData.length) return;
 
-        // Ambil jam & menit dari string "YYYY-MM-DD HH:MM"
-        const timePart = dateStr.split(" ")[1] || "";
-        if (!timePart) return;
-        const [hStr, mStr] = timePart.split(":");
-        const totalMin = parseInt(hStr, 10) * 60 + parseInt(mStr || "0", 10);
-
-        // Parse format shift_time: "07:00 - 15:00" atau "23:00 - 07:00"
         let matched = false;
         for (const shift of shiftData) {
           if (!shift.time) continue;
-          const parts = shift.time.split("-").map((s) => s.trim());
-          if (parts.length < 2) continue;
-          const [startH, startM] = parts[0].split(":").map(Number);
-          const [endH, endM] = parts[1].split(":").map(Number);
-          const startMin = startH * 60 + startM;
-          const endMin = endH * 60 + endM;
+          // Regex menangkap "07:00 - 15:00" maupun "07:00-15:00"
+          const m = shift.time.match(
+            /(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/,
+          );
+          if (!m) continue;
+          const startMin = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+          const endMin = parseInt(m[3], 10) * 60 + parseInt(m[4], 10);
 
-          let match = false;
-          if (startMin < endMin) {
-            // Shift normal (tidak melewati tengah malam)
-            match = totalMin >= startMin && totalMin < endMin;
-          } else {
-            // Shift melewati tengah malam, mis. 23:00 - 07:00
-            match = totalMin >= startMin || totalMin < endMin;
-          }
+          // Shift normal vs shift yang melewati tengah malam (mis. 23:00 – 07:00)
+          const inRange =
+            startMin < endMin
+              ? totalMin >= startMin && totalMin < endMin
+              : totalMin >= startMin || totalMin < endMin;
 
-          if (match) {
+          if (inRange) {
             this.form.shift_id = String(shift.id);
             this.shiftAutoDetected = true;
-            // Paksa update DOM select secara langsung agar sinkron
+            // Paksa sinkron DOM select sekarang juga (belt-and-suspenders)
             const sel = document.querySelector('select[name="shift_id"]');
-            if (sel) sel.value = String(shift.id);
+            if (sel) {
+              sel.value = String(shift.id);
+              sel.dispatchEvent(new Event("change"));
+            }
             matched = true;
             break;
           }

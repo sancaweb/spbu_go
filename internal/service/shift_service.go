@@ -11,6 +11,7 @@ type ShiftService interface {
 	Create(shift *entity.Shift) error
 	Update(shift *entity.Shift) error
 	Delete(id uint) error
+	IsUsed(id uint) (bool, error)
 }
 
 type shiftService struct {
@@ -39,4 +40,8 @@ func (s *shiftService) Update(shift *entity.Shift) error {
 
 func (s *shiftService) Delete(id uint) error {
 	return s.repo.Delete(id)
+}
+
+func (s *shiftService) IsUsed(id uint) (bool, error) {
+	return s.repo.IsUsed(id)
 }

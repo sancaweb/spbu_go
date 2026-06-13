@@ -9,12 +9,28 @@
         Pencatatan penjualan harian per shift
       </p>
     </div>
-    <a
-      href="/transaction/penjualan/create"
-      class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg shadow transition"
-    >
-      <i class="fas fa-plus"></i> Buat Penjualan
-    </a>
+    <div class="flex items-center gap-2">
+      <button
+        onclick="openFilterModal()"
+        class="inline-flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg shadow border border-gray-200 transition"
+      >
+        <i class="fas fa-filter"></i>
+        Filter
+        <span
+          id="filter-badge"
+          class="hidden ml-1 bg-blue-600 text-white text-xs font-bold px-1.5 py-0.5 rounded-full"
+          >!</span
+        >
+      </button>
+      <a
+        href="/transaction/penjualan/create"
+        class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg shadow transition"
+      >
+        <i class="fas fa-plus"></i>
+        <i class="fas fa-file-invoice"></i>
+        Buat Penjualan
+      </a>
+    </div>
   </div>
 
   <!-- ── DataTable Card ────────────────────────────────────────────────── -->
@@ -44,6 +60,83 @@
         </thead>
         <tbody></tbody>
       </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── Filter Modal ─────────────────────────────────────────────────────────── -->
+<div id="filter-modal" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/40" onclick="closeFilterModal()"></div>
+  <div
+    class="relative z-10 flex items-start justify-center min-h-screen pt-24 px-4"
+  >
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b">
+        <h3 class="font-semibold text-gray-800">
+          <i class="fas fa-filter mr-2 text-blue-500"></i>Filter Penjualan
+        </h3>
+        <button
+          onclick="closeFilterModal()"
+          class="text-gray-400 hover:text-gray-600 text-xl"
+        >
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="p-6 space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1"
+            >No. Form</label
+          >
+          <input
+            id="f-no-form"
+            type="text"
+            placeholder="Cari nomor form..."
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+          />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1"
+            >Tanggal</label
+          >
+          <input
+            id="f-tanggal"
+            type="date"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+          />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1"
+            >Shift</label
+          >
+          <select
+            id="f-shift-id"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+          >
+            <option value="">-- Semua Shift --</option>
+            {{ range .Shifts }}
+            <option value="{{ .ID }}">
+              {{ .ShiftName }}{{ if .ShiftTime }} ({{ .ShiftTime }}){{ end }}
+            </option>
+            {{ end }}
+          </select>
+        </div>
+      </div>
+      <div
+        class="flex items-center justify-end gap-3 px-6 py-4 border-t bg-gray-50"
+      >
+        <button
+          onclick="resetFilter()"
+          class="px-4 py-2 text-sm text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+        >
+          Reset
+        </button>
+        <button
+          onclick="applyFilter()"
+          class="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+        >
+          Terapkan
+        </button>
+      </div>
     </div>
   </div>
 </div>
@@ -78,6 +171,42 @@
   </div>
 </div>
 
+<!-- jQuery + DataTables — must be loaded before the init script below -->
+<link rel="stylesheet" href="/static/vendor/jquery.dataTables.min.css" />
+<link
+  rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+/>
+<script src="/static/vendor/jquery-3.7.1.min.js"></script>
+<script src="/static/vendor/jquery.dataTables.min.js"></script>
+<style>
+  /* Override DataTables to blend with Tailwind design */
+  .dataTables_wrapper .dataTables_length select,
+  .dataTables_wrapper .dataTables_filter input {
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+  }
+  .dataTables_wrapper .dataTables_filter input:focus {
+    outline: none;
+    border-color: #93c5fd;
+    box-shadow: 0 0 0 2px rgba(147, 197, 253, 0.35);
+  }
+  table.dataTable tbody tr:hover {
+    background-color: #eff6ff !important;
+  }
+  .dataTables_wrapper .dataTables_paginate .paginate_button {
+    border-radius: 0.375rem !important;
+    margin: 0 2px;
+  }
+  .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+    background: #2563eb !important;
+    color: #fff !important;
+    border: none !important;
+  }
+</style>
+
 <script>
   // ── DataTables init ──────────────────────────────────────────────────────────
   $(function () {
@@ -86,11 +215,20 @@
     window._tblPenjualan = $("#tbl-penjualan").DataTable({
       processing: true,
       serverSide: true,
+      searchDelay: 500,
       ajax: {
         url: "/transaction/penjualan/datatable",
         type: "POST",
         data: function (d) {
+          d.filter_no_form = window._pjlFilter ? window._pjlFilter.noForm : "";
+          d.filter_tanggal = window._pjlFilter ? window._pjlFilter.tanggal : "";
+          d.filter_shift_id = window._pjlFilter
+            ? window._pjlFilter.shiftId
+            : "";
           return d;
+        },
+        error: function (xhr, err) {
+          console.error("DataTables AJAX error:", err, xhr.responseText);
         },
       },
       columns: [
@@ -193,7 +331,7 @@
         zeroRecords: "Data tidak ditemukan",
         paginate: { previous: "‹", next: "›" },
       },
-      dom: '<"flex flex-wrap items-center justify-between gap-2 px-4 py-3"lf>rt<"flex flex-wrap items-center justify-between gap-2 px-4 py-3"ip>',
+      dom: '<"flex flex-wrap items-center justify-between gap-2 px-4 py-3"l>rt<"flex flex-wrap items-center justify-between gap-2 px-4 py-3"ip>',
       pageLength: 25,
     });
   });
@@ -285,8 +423,16 @@
     );
     html += "</div>";
 
-    // Detail nozzle table
+    // Detail nozzle table — sort by tiang name then nozzle description
     if (p.details && p.details.length > 0) {
+      p.details = p.details.slice().sort(function (a, b) {
+        var ta = (a.tiang && a.tiang.name) || "";
+        var tb = (b.tiang && b.tiang.name) || "";
+        if (ta !== tb) return ta.localeCompare(tb);
+        var na = (a.nozzle && a.nozzle.description) || "";
+        var nb = (b.nozzle && b.nozzle.description) || "";
+        return na.localeCompare(nb);
+      });
       html += '<h4 class="font-semibold text-gray-700 mb-2">Detail Nozzle</h4>';
       html +=
         '<div class="overflow-x-auto"><table class="w-full text-sm border-collapse">';
@@ -349,6 +495,47 @@
       val +
       "</p></div>"
     );
+  }
+
+  // ── Filter modal ──────────────────────────────────────────────────────────────
+  window._pjlFilter = null;
+
+  function openFilterModal() {
+    // Restore current values into inputs
+    var f = window._pjlFilter || {};
+    document.getElementById("f-no-form").value = f.noForm || "";
+    document.getElementById("f-tanggal").value = f.tanggal || "";
+    document.getElementById("f-shift-id").value = f.shiftId || "";
+    document.getElementById("filter-modal").classList.remove("hidden");
+  }
+
+  function closeFilterModal() {
+    document.getElementById("filter-modal").classList.add("hidden");
+  }
+
+  function applyFilter() {
+    window._pjlFilter = {
+      noForm: document.getElementById("f-no-form").value.trim(),
+      tanggal: document.getElementById("f-tanggal").value,
+      shiftId: document.getElementById("f-shift-id").value,
+    };
+    var active =
+      window._pjlFilter.noForm ||
+      window._pjlFilter.tanggal ||
+      window._pjlFilter.shiftId;
+    document.getElementById("filter-badge").classList.toggle("hidden", !active);
+    closeFilterModal();
+    window._tblPenjualan.ajax.reload(null, false);
+  }
+
+  function resetFilter() {
+    document.getElementById("f-no-form").value = "";
+    document.getElementById("f-tanggal").value = "";
+    document.getElementById("f-shift-id").value = "";
+    window._pjlFilter = null;
+    document.getElementById("filter-badge").classList.add("hidden");
+    closeFilterModal();
+    window._tblPenjualan.ajax.reload(null, false);
   }
 
   // ── Delete ────────────────────────────────────────────────────────────────────

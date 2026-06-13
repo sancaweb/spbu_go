@@ -1,0 +1,622 @@
+{{ define "transaction/piutang/rekap.html" }} {{ template "header.html" . }}
+
+<div x-data="rekapPiutangPage()" class="space-y-5">
+  <div
+    class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
+  >
+    <div>
+      <h2 class="text-2xl font-bold text-slate-800">{{ .Title }}</h2>
+      <p class="text-slate-500 text-sm mt-1">
+        Ringkasan piutang per pelanggan B2B
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <div
+        class="bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm flex items-center gap-2"
+      >
+        <label for="bulan-filter" class="text-sm font-medium text-slate-600"
+          >Periode Bulan</label
+        >
+        <input
+          id="bulan-filter"
+          type="month"
+          x-model="selectedMonth"
+          @change="applyMonthFilter()"
+          class="border border-slate-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+        />
+      </div>
+      <a
+        href="/transaction/piutang"
+        class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-lg font-semibold shadow-sm border border-slate-200 transition-all flex items-center gap-2"
+      >
+        <svg
+          class="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M15 19l-7-7 7-7"
+          />
+        </svg>
+        Data Piutang
+      </a>
+    </div>
+  </div>
+
+  <div
+    class="glass-card bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"
+  >
+    <button
+      type="button"
+      @click="showSummaryCard = !showSummaryCard"
+      class="w-full px-6 py-4 border-b border-slate-100 flex items-center justify-between text-left hover:bg-slate-50 transition"
+    >
+      <div>
+        <h3 class="font-semibold text-slate-700">
+          Ringkasan Rekap (Collapsible)
+        </h3>
+        <p class="text-xs text-slate-400 mt-1">
+          Default tertutup. Klik untuk menampilkan ringkasan.
+        </p>
+      </div>
+      <svg
+        class="w-5 h-5 text-slate-500 transition-transform"
+        :class="showSummaryCard ? 'rotate-180' : ''"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M19 9l-7 7-7-7"
+        />
+      </svg>
+    </button>
+
+    <div x-show="showSummaryCard" x-transition style="display: none">
+      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 p-5">
+        <div
+          class="glass-card bg-white rounded-2xl border border-slate-200 p-5"
+        >
+          <p
+            class="text-xs font-semibold uppercase tracking-wider text-slate-400"
+          >
+            Total Dokumen
+          </p>
+          <p
+            class="mt-2 text-2xl font-bold text-slate-800"
+            x-text="formatIDR(stats.total_piutang)"
+          ></p>
+        </div>
+        <div
+          class="glass-card bg-white rounded-2xl border border-slate-200 p-5"
+        >
+          <p
+            class="text-xs font-semibold uppercase tracking-wider text-slate-400"
+          >
+            Dokumen Lunas
+          </p>
+          <p
+            class="mt-2 text-2xl font-bold text-green-600"
+            x-text="formatIDR(stats.total_paid)"
+          ></p>
+        </div>
+        <div
+          class="glass-card bg-white rounded-2xl border border-slate-200 p-5"
+        >
+          <p
+            class="text-xs font-semibold uppercase tracking-wider text-slate-400"
+          >
+            Nilai Belum Lunas
+          </p>
+          <p
+            class="mt-2 text-2xl font-bold text-red-600"
+            x-text="'Rp ' + formatIDR(stats.nilai_unpaid)"
+          ></p>
+        </div>
+        <div
+          class="glass-card bg-white rounded-2xl border border-slate-200 p-5"
+        >
+          <p
+            class="text-xs font-semibold uppercase tracking-wider text-slate-400"
+          >
+            Nilai Lunas
+          </p>
+          <p
+            class="mt-2 text-2xl font-bold text-[#005596]"
+            x-text="'Rp ' + formatIDR(stats.nilai_paid)"
+          ></p>
+        </div>
+      </div>
+
+      <div class="px-6 pb-6">
+        <div class="overflow-x-auto">
+          <table
+            id="piutang-rekap-table"
+            class="w-full text-left border-collapse"
+            style="width: 100%"
+          >
+            <thead>
+              <tr class="bg-slate-50 border-b border-slate-200">
+                <th
+                  class="p-3 font-semibold text-slate-600 text-sm border border-slate-200 w-10"
+                >
+                  #
+                </th>
+                <th
+                  class="p-3 font-semibold text-slate-600 text-sm border border-slate-200"
+                >
+                  Pelanggan
+                </th>
+                <th
+                  class="p-3 font-semibold text-slate-600 text-sm border border-slate-200 text-right"
+                >
+                  Total Dokumen
+                </th>
+                <th
+                  class="p-3 font-semibold text-slate-600 text-sm border border-slate-200 text-right"
+                >
+                  Belum Lunas
+                </th>
+                <th
+                  class="p-3 font-semibold text-slate-600 text-sm border border-slate-200 text-right"
+                >
+                  Lunas
+                </th>
+                <th
+                  class="p-3 font-semibold text-slate-600 text-sm border border-slate-200 text-right"
+                >
+                  Nilai Belum Lunas
+                </th>
+                <th
+                  class="p-3 font-semibold text-slate-600 text-sm border border-slate-200 text-right"
+                >
+                  Nilai Lunas
+                </th>
+                <th
+                  class="p-3 font-semibold text-slate-600 text-sm border border-slate-200 text-right"
+                >
+                  Total Nilai
+                </th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div
+    class="glass-card bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"
+  >
+    <div
+      class="px-6 py-4 border-b border-slate-100 flex justify-between items-center"
+    >
+      <h3 class="font-semibold text-slate-700">
+        Pengelompokan Harian Piutang & Pembayaran
+      </h3>
+      <span
+        class="text-xs text-slate-500"
+        x-text="'Periode: ' + monthLabel"
+      ></span>
+    </div>
+
+    <div class="p-6 space-y-6">
+      <template x-if="loadingGrouped">
+        <div class="flex items-center justify-center py-10 text-slate-500">
+          <i class="fas fa-spinner fa-spin mr-2"></i> Memuat data
+          pengelompokan...
+        </div>
+      </template>
+
+      <template x-if="!loadingGrouped && groups.length === 0">
+        <div class="text-center py-10 text-slate-500">
+          Tidak ada data pada bulan yang dipilih.
+        </div>
+      </template>
+
+      <template x-for="(g, idx) in groups" :key="idx">
+        <div class="border border-slate-200 rounded-xl overflow-hidden">
+          <div
+            class="bg-cyan-100 px-4 py-2 font-semibold text-slate-700"
+            x-text="g.tanggal_label"
+          ></div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm border-collapse rekap-group-table">
+              <thead>
+                <tr>
+                  <th
+                    rowspan="2"
+                    class="border border-slate-300 px-2 py-2 text-center"
+                  >
+                    TANGGAL
+                  </th>
+                  <th
+                    rowspan="2"
+                    class="border border-slate-300 px-2 py-2 text-center"
+                  >
+                    NO
+                  </th>
+                  <th
+                    colspan="2"
+                    class="border border-slate-300 px-2 py-2 text-center"
+                  >
+                    DATA PIUTANG
+                  </th>
+                  <th
+                    colspan="3"
+                    class="border border-slate-300 px-2 py-2 text-center border-l-4 border-l-black"
+                  >
+                    DATA PEMBAYARAN PIUTANG
+                  </th>
+                </tr>
+                <tr>
+                  <th class="border border-slate-300 px-2 py-2 text-center">
+                    PELANGGAN
+                  </th>
+                  <th class="border border-slate-300 px-2 py-2 text-center">
+                    TAGIHAN
+                  </th>
+                  <th
+                    class="border border-slate-300 px-2 py-2 text-center border-l-4 border-l-black"
+                  >
+                    PELANGGAN
+                  </th>
+                  <th class="border border-slate-300 px-2 py-2 text-center">
+                    PEMBAYARAN
+                  </th>
+                  <th class="border border-slate-300 px-2 py-2 text-center">
+                    PERIODE PIUTANG
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="(r, ridx) in g.rows" :key="ridx">
+                  <tr>
+                    <td
+                      class="border border-slate-300 px-2 py-1"
+                      x-text="ridx === 0 ? g.tanggal_label : ''"
+                    ></td>
+                    <td
+                      class="border border-slate-300 px-2 py-1 text-center"
+                      x-text="r.no"
+                    ></td>
+                    <td
+                      class="border border-slate-300 px-2 py-1"
+                      x-text="r.piutang_pelanggan"
+                    ></td>
+                    <td
+                      class="border border-slate-300 px-2 py-1 text-right"
+                      x-text="formatIDRDecimal(r.piutang_tagihan)"
+                    ></td>
+                    <td
+                      class="border border-slate-300 px-2 py-1 text-center bg-slate-100 border-l-4 border-l-black"
+                      x-text="r.bayar_pelanggan"
+                    ></td>
+                    <td
+                      class="border border-slate-300 px-2 py-1 text-right bg-slate-100"
+                      x-text="formatIDRDecimal(r.bayar_nominal)"
+                    ></td>
+                    <td
+                      class="border border-slate-300 px-2 py-1 text-center bg-slate-100"
+                      x-text="r.bayar_periode_piutang"
+                    ></td>
+                  </tr>
+                </template>
+                <tr class="bg-cyan-100 font-bold text-slate-700">
+                  <td
+                    colspan="3"
+                    class="border border-slate-300 px-2 py-2 text-right"
+                  >
+                    TOTAL PIUTANG :
+                  </td>
+                  <td
+                    class="border border-slate-300 px-2 py-2 text-right"
+                    x-text="formatIDRDecimal(g.total_piutang)"
+                  ></td>
+                  <td
+                    class="border border-slate-300 px-2 py-2 text-right border-l-4 border-l-black"
+                    colspan="1"
+                  >
+                    TOTAL PEMBAYARAN :
+                  </td>
+                  <td
+                    class="border border-slate-300 px-2 py-2 text-right"
+                    x-text="formatIDRDecimal(g.total_pembayaran)"
+                  ></td>
+                  <td class="border border-slate-300 px-2 py-2"></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <div class="px-6 py-4 border-t border-slate-200 bg-slate-50">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+          <p
+            class="text-xs uppercase tracking-wide text-blue-700 font-semibold"
+          >
+            Grand Total Piutang
+          </p>
+          <p
+            class="text-lg font-bold text-blue-900"
+            x-text="'Rp ' + formatIDR(grand.grand_total_piutang)"
+          ></p>
+        </div>
+        <div
+          class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3"
+        >
+          <p
+            class="text-xs uppercase tracking-wide text-emerald-700 font-semibold"
+          >
+            Grand Total Pembayaran Piutang
+          </p>
+          <p
+            class="text-lg font-bold text-emerald-900"
+            x-text="'Rp ' + formatIDR(grand.grand_total_pembayaran)"
+          ></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<link rel="stylesheet" href="/static/vendor/jquery.dataTables.min.css" />
+<link
+  rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+/>
+<script src="/static/vendor/jquery-3.7.1.min.js"></script>
+<script src="/static/vendor/jquery.dataTables.min.js"></script>
+
+<style>
+  .dataTables_wrapper .dataTables_length select,
+  .dataTables_wrapper .dataTables_filter input {
+    border: 1px solid #cbd5e1;
+    border-radius: 0.5rem;
+    padding: 0.25rem 0.5rem;
+    outline: none;
+    font-size: 0.875rem;
+  }
+  .dataTables_wrapper .dataTables_info {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    padding-top: 0.75rem;
+  }
+  .dataTables_wrapper .dataTables_paginate .paginate_button.current,
+  .dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
+    background: #005596 !important;
+    color: white !important;
+    border: none;
+    border-radius: 0.5rem;
+  }
+  .dataTables_wrapper .dataTables_paginate .paginate_button {
+    border-radius: 0.5rem;
+    border: none !important;
+  }
+  .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+    background: #f1f5f9 !important;
+    color: #1e293b !important;
+    border: none !important;
+  }
+  #piutang-rekap-table tbody td {
+    border-right: 1px solid #f1f5f9;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  #piutang-rekap-table tbody tr:hover {
+    background-color: rgba(248, 250, 252, 0.8);
+  }
+  .rekap-group-table th,
+  .rekap-group-table td {
+    white-space: nowrap;
+  }
+</style>
+
+<script>
+  document.addEventListener("alpine:init", function () {
+    Alpine.data("rekapPiutangPage", function () {
+      return {
+        stats: {
+          total_piutang: 0,
+          total_paid: 0,
+          nilai_unpaid: 0,
+          nilai_paid: 0,
+        },
+        selectedMonth: "",
+        monthLabel: "-",
+        showSummaryCard: false,
+        loadingGrouped: false,
+        dt: null,
+        groups: [],
+        grand: { grand_total_piutang: 0, grand_total_pembayaran: 0 },
+
+        init: function () {
+          var now = new Date();
+          this.selectedMonth =
+            now.getFullYear() +
+            "-" +
+            String(now.getMonth() + 1).padStart(2, "0");
+          this.monthLabel = this.selectedMonth;
+          this.initTable();
+          this.applyMonthFilter();
+        },
+
+        applyMonthFilter: function () {
+          this.monthLabel = this.selectedMonth || "-";
+          this.loadSummary();
+          this.loadGrouped();
+          if (this.dt) this.dt.ajax.reload(null, false);
+        },
+
+        loadSummary: async function () {
+          try {
+            var res = await fetch(
+              "/transaction/piutang/summary?bulan=" +
+                encodeURIComponent(this.selectedMonth),
+            );
+            var json = await res.json();
+            if (json.status === "success") this.stats = json.data || this.stats;
+          } catch (e) {}
+        },
+
+        loadGrouped: async function () {
+          this.loadingGrouped = true;
+          try {
+            var res = await fetch(
+              "/transaction/piutang/rekap/grouped?bulan=" +
+                encodeURIComponent(this.selectedMonth),
+            );
+            var json = await res.json();
+            if (json.status === "success") {
+              this.groups = (json.data && json.data.groups) || [];
+              this.grand = (json.data && json.data.grand_total) || {
+                grand_total_piutang: 0,
+                grand_total_pembayaran: 0,
+              };
+            } else {
+              this.groups = [];
+              this.grand = {
+                grand_total_piutang: 0,
+                grand_total_pembayaran: 0,
+              };
+            }
+          } catch (e) {
+            this.groups = [];
+            this.grand = { grand_total_piutang: 0, grand_total_pembayaran: 0 };
+          } finally {
+            this.loadingGrouped = false;
+          }
+        },
+
+        initTable: function () {
+          var self = this;
+          if ($.fn.DataTable.isDataTable("#piutang-rekap-table")) {
+            $("#piutang-rekap-table").DataTable().destroy();
+          }
+          this.dt = $("#piutang-rekap-table").DataTable({
+            processing: true,
+            serverSide: true,
+            ajax: {
+              url: "/transaction/piutang/rekap/datatable",
+              type: "POST",
+              data: function (d) {
+                d.filter_waktu_mulai = self.selectedMonth || "";
+                return d;
+              },
+            },
+            columns: [
+              {
+                data: null,
+                orderable: false,
+                searchable: false,
+                render: function (_, __, ___, meta) {
+                  return meta.row + meta.settings._iDisplayStart + 1;
+                },
+              },
+              { data: "partner_name" },
+              {
+                data: "total_piutang",
+                className: "text-right",
+                render: function (v) {
+                  return formatIDR(v);
+                },
+              },
+              {
+                data: "total_unpaid",
+                className: "text-right",
+                render: function (v) {
+                  return (
+                    '<span class="font-semibold text-amber-700">' +
+                    formatIDR(v) +
+                    "</span>"
+                  );
+                },
+              },
+              {
+                data: "total_paid",
+                className: "text-right",
+                render: function (v) {
+                  return (
+                    '<span class="font-semibold text-green-700">' +
+                    formatIDR(v) +
+                    "</span>"
+                  );
+                },
+              },
+              {
+                data: "nilai_unpaid",
+                className: "text-right",
+                render: function (v) {
+                  return (
+                    '<span class="font-semibold text-red-600">Rp ' +
+                    formatIDR(v) +
+                    "</span>"
+                  );
+                },
+              },
+              {
+                data: "nilai_paid",
+                className: "text-right",
+                render: function (v) {
+                  return (
+                    '<span class="font-semibold text-green-700">Rp ' +
+                    formatIDR(v) +
+                    "</span>"
+                  );
+                },
+              },
+              {
+                data: "nilai_total",
+                className: "text-right",
+                render: function (v) {
+                  return (
+                    '<span class="font-semibold text-[#005596]">Rp ' +
+                    formatIDR(v) +
+                    "</span>"
+                  );
+                },
+              },
+            ],
+            order: [[1, "asc"]],
+            language: {
+              processing: "Memuat data...",
+              emptyTable: "Tidak ada rekap piutang",
+              lengthMenu: "Tampilkan _MENU_ data",
+              info: "Menampilkan _START_ - _END_ dari _TOTAL_ data",
+              infoEmpty: "Tidak ada data",
+              search: "Cari:",
+              paginate: {
+                first: "&laquo;",
+                last: "&raquo;",
+                next: "&rsaquo;",
+                previous: "&lsaquo;",
+              },
+            },
+            dom: '<"flex flex-col md:flex-row justify-between items-center gap-3 mb-4"lf>rt<"flex flex-col md:flex-row justify-between items-center gap-3 mt-4"ip>',
+            pageLength: 25,
+          });
+        },
+
+        formatIDR: function (v) {
+          return formatIDR(v);
+        },
+        formatIDRDecimal: function (v) {
+          var n = Number(v || 0);
+          return formatIDR(n) + ".00";
+        },
+      };
+    });
+  });
+</script>
+
+{{ template "footer.html" . }} {{ end }}

@@ -173,6 +173,18 @@ func Seed() {
 	// --- Kedatangan BBM Seeder --- (must run after penebusan + shift seeding)
 	seedKedatanganBBM()
 
+	// --- Penjualan Seeder --- (must run after nozzle + shift seeding)
+	seedPenjualan()
+
+	// --- Piutang Seeder --- (must run after penjualan + partner + BBM seeding)
+	seedPiutang()
+
+	// --- Penyusutan Seeder --- (must run after BBM + shift seeding)
+	seedPenyusutan()
+
+	// --- Jenis Test Seeder ---
+	seedJenisTest()
+
 	log.Println("Database seeded successfully")
 }
 
@@ -744,4 +756,346 @@ func seedPenebusan() {
 		seeded++
 	}
 	log.Printf("Seeded %d penebusan records (total now: %d)", seeded, currentCount+int64(seeded))
+}
+
+// seedPenjualan — seed sample data transaksi penjualan BBM per shift.
+// Idempotent: skip jika sudah ada data.
+func seedPenjualan() {
+	db := database.DB
+
+	var count int64
+	db.Model(&entity.TrxPenjualan{}).Count(&count)
+	if count > 0 {
+		log.Printf("Penjualan sudah ada %d rows, skip seeding", count)
+		return
+	}
+
+	// Ambil data referensi
+	var shifts []entity.Shift
+	db.Order("id ASC").Find(&shifts)
+	if len(shifts) == 0 {
+		log.Println("Penjualan seeder: tidak ada shift, skip")
+		return
+	}
+
+	var nozzles []entity.Nozzle
+	db.Where("is_active = ?", true).Preload("BBM").Preload("Tiang").Order("id ASC").Find(&nozzles)
+	if len(nozzles) == 0 {
+		log.Println("Penjualan seeder: tidak ada nozzle aktif, skip")
+		return
+	}
+
+	// Buat 30 record penjualan: 10 hari × 3 shift
+	baseDate := time.Date(2026, 1, 1, 0, 0, 0, 0, time.Local)
+	shiftTimes := []struct{ mulai, akhir int }{
+		{7, 15},
+		{15, 23},
+		{23, 31}, // shift 3 melewati tengah malam
+	}
+
+	seeded := 0
+	for day := 0; day < 10; day++ {
+		tgl := baseDate.AddDate(0, 0, day)
+		for si, shift := range shifts {
+			if si >= len(shiftTimes) {
+				break
+			}
+			st := shiftTimes[si]
+			waktuMulai := time.Date(tgl.Year(), tgl.Month(), tgl.Day(), st.mulai, 0, 0, 0, time.Local)
+			waktuAkhir := time.Date(tgl.Year(), tgl.Month(), tgl.Day(), st.akhir%24, 0, 0, 0, time.Local)
+			if st.akhir >= 24 {
+				waktuAkhir = waktuAkhir.AddDate(0, 0, 1)
+			}
+
+			// Buat detail per nozzle dengan data totalisator realistis
+			var details []entity.TrxPenjualanDetail
+			var totalRp int64
+			base := int64((day*len(shifts)+si)*1000 + 50000) // totalisator awal berbeda tiap shift
+			for ni, nz := range nozzles {
+				if nz.BBM == nil {
+					continue
+				}
+				// Volume penjualan bervariasi: 200-800 liter per nozzle
+				jmlLiter := int64(200 + (day*len(nozzles)+ni)*37%600)
+				price := int64(nz.BBM.Price)
+				margin := int64(nz.BBM.Margin)
+				totAwal := base + int64(ni)*100000
+				totAkhir := totAwal + jmlLiter
+				jmlRupiah := jmlLiter * price
+				totalRp += jmlRupiah
+				tiangID := uint(0)
+				if nz.Tiang != nil {
+					tiangID = nz.Tiang.ID
+				}
+				details = append(details, entity.TrxPenjualanDetail{
+					TiangID:          tiangID,
+					NozzleID:         nz.ID,
+					BBMID:            nz.BBMID,
+					BBMPrice:         price,
+					Margin:           margin,
+					TotalisatorAwal:  totAwal,
+					TotalisatorAkhir: totAkhir,
+					JmlLiter:         jmlLiter,
+					JmlRupiah:        jmlRupiah,
+				})
+			}
+
+			if len(details) == 0 {
+				continue
+			}
+
+			// totalPenerimaan = totalRp (semua tunai), aktual sedikit variatif ±50.000
+			delta := int64((day*3+si)%3-1) * 50000
+			aktualUang := totalRp + delta
+			selisih := aktualUang - totalRp
+
+			header := entity.TrxPenjualan{
+				ShiftID:            shift.ID,
+				WaktuMulai:         waktuMulai,
+				WaktuAkhir:         waktuAkhir,
+				TotalRpTotalisator: totalRp,
+				TotalPenerimaan:    totalRp,
+				AktualUang:         aktualUang,
+				Selisih:            selisih,
+				Details:            details,
+			}
+
+			// Generate no_penjualan: PJL/YYYY/MM/seq
+			seq := day*len(shifts) + si + 1
+			header.NoPenjualan = fmt.Sprintf("PJL/%04d/%02d/%04d",
+				waktuMulai.Year(), int(waktuMulai.Month()), seq)
+
+			if err := db.Omit("Shift", "Creator", "Updater", "Details.Tiang", "Details.Nozzle", "Details.BBM").Create(&header).Error; err != nil {
+				log.Printf("Failed to seed penjualan %s: %v", header.NoPenjualan, err)
+				continue
+			}
+			seeded++
+		}
+	}
+	log.Printf("Seeded %d penjualan records", seeded)
+}
+
+// seedPiutang — seed sample piutang B2B using real FK references:
+// trx_penjualan.id_penjualan, partners.id, and bbm.id.
+func seedPiutang() {
+	db := database.DB
+
+	var count int64
+	db.Model(&entity.TrxPiutang{}).Count(&count)
+	if count > 0 {
+		log.Printf("Piutang sudah ada %d rows, skip seeding", count)
+		return
+	}
+
+	var partners []entity.Partner
+	db.Where("is_active = ?", true).Order("id ASC").Find(&partners)
+	if len(partners) == 0 {
+		log.Println("Piutang seeder: tidak ada partner aktif, skip")
+		return
+	}
+
+	var penjualanList []entity.TrxPenjualan
+	db.Preload("Details").
+		Order("waktu_mulai ASC").
+		Limit(12).
+		Find(&penjualanList)
+	if len(penjualanList) == 0 {
+		log.Println("Piutang seeder: tidak ada penjualan, skip")
+		return
+	}
+
+	drivers := []string{
+		"Rizal Firmansyah",
+		"Dadang Setiawan",
+		"Yusuf Maulana",
+		"Rudi Hartanto",
+		"Agus Prasetyo",
+		"Hendra Saputra",
+	}
+	noPols := []string{
+		"B 9123 KQ",
+		"D 8031 AL",
+		"F 7712 MK",
+		"B 1045 TX",
+		"T 5529 HR",
+		"Z 4088 YA",
+	}
+
+	var admin entity.User
+	var createdBy *uint
+	if err := db.Where("username = ?", "admin").First(&admin).Error; err == nil {
+		createdBy = &admin.ID
+	}
+
+	seeded := 0
+	for i, pjl := range penjualanList {
+		if len(pjl.Details) == 0 {
+			continue
+		}
+
+		partner := partners[i%len(partners)]
+		createdAt := pjl.WaktuMulai.Add(time.Duration(30+i*7) * time.Minute)
+		status := entity.PiutangUnpaid
+		if i%4 == 0 {
+			status = entity.PiutangPaid
+		}
+
+		detailCount := 2 + (i % 3)
+		if detailCount > len(pjl.Details) {
+			detailCount = len(pjl.Details)
+		}
+
+		piutang := entity.TrxPiutang{
+			PenjualanID:  pjl.ID,
+			PelangganID:  partner.ID,
+			Status:       status,
+			IsInvoiced:   i%3 != 1,
+			Created:      createdAt,
+			Updated:      createdAt,
+			CreatedBy:    createdBy,
+			UpdatedBy:    createdBy,
+			TotalTagihan: 0,
+		}
+
+		for j := 0; j < detailCount; j++ {
+			src := pjl.Details[(i+j)%len(pjl.Details)]
+			qty := int64(20 + ((i+1)*(j+2)*7)%75)
+			harga := src.BBMPrice
+			if harga <= 0 {
+				continue
+			}
+			totalLine := harga * qty
+			piutang.TotalTagihan += totalLine
+			piutang.Details = append(piutang.Details, entity.TrxPiutangDetail{
+				PenjualanID: pjl.ID,
+				NoVoucher:   fmt.Sprintf("VCR/%04d/%02d/%03d", pjl.WaktuMulai.Year(), int(pjl.WaktuMulai.Month()), i*10+j+1),
+				NoPol:       noPols[(i+j)%len(noPols)],
+				DriverName:  drivers[(i+j)%len(drivers)],
+				BBMID:       src.BBMID,
+				HargaBBM:    harga,
+				Margin:      src.Margin,
+				QtyLiter:    qty,
+				TotalLine:   totalLine,
+				Created:     createdAt,
+				Updated:     createdAt,
+				CreatedBy:   createdBy,
+				UpdatedBy:   createdBy,
+			})
+		}
+
+		if len(piutang.Details) == 0 || piutang.TotalTagihan == 0 {
+			continue
+		}
+
+		if err := db.Omit(
+			"Partner", "Penjualan", "Creator", "Updater",
+			"Details.BBM", "Details.Penjualan", "Details.Creator", "Details.Updater",
+		).Create(&piutang).Error; err != nil {
+			log.Printf("Failed to seed piutang penjualan_id=%d partner_id=%d: %v", pjl.ID, partner.ID, err)
+			continue
+		}
+		seeded++
+	}
+
+	log.Printf("Seeded %d piutang records", seeded)
+}
+
+// seedPenyusutan — seed sample data penyusutan/susut BBM.
+// Idempotent: skip jika sudah ada data.
+func seedPenyusutan() {
+	db := database.DB
+
+	var count int64
+	db.Model(&entity.TrxPenyusutan{}).Count(&count)
+	if count > 0 {
+		log.Printf("Penyusutan sudah ada %d rows, skip seeding", count)
+		return
+	}
+
+	// Ambil referensi
+	var shifts []entity.Shift
+	db.Order("id ASC").Find(&shifts)
+	var bbmList []entity.BBM
+	db.Where("is_active = ?", true).Order("id ASC").Find(&bbmList)
+	if len(shifts) == 0 || len(bbmList) == 0 {
+		log.Println("Penyusutan seeder: data referensi tidak cukup, skip")
+		return
+	}
+
+	keterangans := []string{
+		"Susut penguapan normal",
+		"Selisih takaran nozzle",
+		"Penyusutan akibat suhu tinggi",
+		"Selisih totalisator vs dip test",
+		"Kebocoran minor tangki",
+	}
+
+	baseDate := time.Date(2026, 1, 1, 0, 0, 0, 0, time.Local)
+	seeded := 0
+	seq := 1
+	for day := 0; day < 10; day++ {
+		tgl := baseDate.AddDate(0, 0, day)
+		// 1-2 record penyusutan per hari, per jenis BBM berbeda
+		numRecords := 1 + day%2
+		for r := 0; r < numRecords; r++ {
+			bbm := bbmList[(day+r)%len(bbmList)]
+			shift := shifts[(day+r)%len(shifts)]
+			hargaDasar := int64(bbm.Price) - int64(bbm.Margin)
+			// Penyusutan kecil: 5-50 liter
+			jmlLiter := int64(5 + (day*3+r*7)%46)
+			nilaiRupiah := jmlLiter * hargaDasar
+
+			pst := entity.TrxPenyusutan{
+				NoPenyusutan:  fmt.Sprintf("PST/%04d/%02d/%04d", tgl.Year(), int(tgl.Month()), seq),
+				TglPenyusutan: tgl,
+				ShiftID:       shift.ID,
+				BBMID:         bbm.ID,
+				JmlLiter:      jmlLiter,
+				HargaDasar:    hargaDasar,
+				NilaiRupiah:   nilaiRupiah,
+				Keterangan:    keterangans[(day+r)%len(keterangans)],
+			}
+
+			if err := db.Omit("Shift", "BBM", "Creator", "Updater").Create(&pst).Error; err != nil {
+				log.Printf("Failed to seed penyusutan %s: %v", pst.NoPenyusutan, err)
+				continue
+			}
+			seq++
+			seeded++
+		}
+	}
+	log.Printf("Seeded %d penyusutan records", seeded)
+}
+
+// seedJenisTest — seed 10 jenis pengujian/kalibrasi BBM default.
+// Idempotent: skip jika sudah ada data.
+func seedJenisTest() {
+	db := database.DB
+
+	var count int64
+	db.Model(&entity.JenisTest{}).Count(&count)
+	if count > 0 {
+		log.Printf("Jenis Test sudah ada %d rows, skip seeding", count)
+		return
+	}
+
+	jenisTests := []entity.JenisTest{
+		{NamaTest: "Density Pengawas", Deskripsi: "Pengujian densitas BBM oleh pengawas internal", IsActive: true},
+		{NamaTest: "Density Teknisi", Deskripsi: "Pengujian densitas BBM oleh teknisi", IsActive: true},
+		{NamaTest: "Density Metrologi", Deskripsi: "Pengujian densitas BBM oleh petugas metrologi legal", IsActive: true},
+		{NamaTest: "Density Audit Pasti Pas", Deskripsi: "Pengujian densitas dalam rangka program audit Pasti Pas Pertamina", IsActive: true},
+		{NamaTest: "Tera Pengawas", Deskripsi: "Tera ulang dispenser oleh pengawas internal SPBU", IsActive: true},
+		{NamaTest: "Tera Teknisi", Deskripsi: "Tera ulang dispenser oleh teknisi dispenser", IsActive: true},
+		{NamaTest: "Tera Metrologi", Deskripsi: "Tera ulang resmi oleh Dinas Metrologi Legal", IsActive: true},
+		{NamaTest: "Tera Audit Pasti Pas", Deskripsi: "Tera ulang dispenser dalam rangka program audit Pasti Pas Pertamina", IsActive: true},
+		{NamaTest: "Tes Nozzle", Deskripsi: "Pengujian akurasi takaran nozzle dispenser", IsActive: true},
+		{NamaTest: "Tes Selang", Deskripsi: "Pengujian kebocoran dan kondisi selang dispenser", IsActive: true},
+	}
+
+	for i := range jenisTests {
+		if err := db.Where(entity.JenisTest{NamaTest: jenisTests[i].NamaTest}).FirstOrCreate(&jenisTests[i]).Error; err != nil {
+			log.Printf("Failed to seed jenis test %s: %v", jenisTests[i].NamaTest, err)
+		}
+	}
+	log.Printf("Seeded %d jenis test records", len(jenisTests))
 }

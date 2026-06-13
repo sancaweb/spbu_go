@@ -22,6 +22,8 @@ type PenjualanService interface {
 	PostJournal(p *entity.TrxPenjualan, createdBy *uint) error
 	// ReverseJournal menghapus semua jurnal terkait satu penjualan (dipakai saat delete).
 	ReverseJournal(id uint64) error
+	// GetLastTotalisatorByNozzle mengembalikan map nozzle_id → totalisator_akhir terakhir.
+	GetLastTotalisatorByNozzle() (map[uint]int64, error)
 }
 
 type penjualanService struct {
@@ -59,6 +61,10 @@ func (s *penjualanService) Delete(id uint64) error {
 
 func (s *penjualanService) ReverseJournal(id uint64) error {
 	return s.accounting.ReverseTransaction("penjualan", uint(id))
+}
+
+func (s *penjualanService) GetLastTotalisatorByNozzle() (map[uint]int64, error) {
+	return s.repo.GetLastTotalisatorByNozzle()
 }
 
 // PostJournal membangun dan memposting jurnal double-entry untuk satu penjualan BBM.

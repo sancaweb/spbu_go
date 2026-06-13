@@ -30,7 +30,8 @@ type TrxPenjualan struct {
 	Selisih            int64 `gorm:"column:selisih;type:bigint;not null;default:0" json:"selisih"`                           // aktual_uang - total_rp_totalisator
 
 	// Relasi detail
-	Details []TrxPenjualanDetail `gorm:"foreignKey:PenjualanID;constraint:OnDelete:CASCADE" json:"details,omitempty"`
+	Details          []TrxPenjualanDetail          `gorm:"foreignKey:PenjualanID;constraint:OnDelete:CASCADE" json:"details,omitempty"`
+	PengeluaranTests []TrxPenjualanPengeluaranTest `gorm:"foreignKey:PenjualanID;constraint:OnDelete:CASCADE" json:"pengeluaran_tests,omitempty"`
 
 	// Audit
 	Created   time.Time `gorm:"column:created;autoCreateTime" json:"created"`
@@ -68,3 +69,20 @@ type TrxPenjualanDetail struct {
 }
 
 func (TrxPenjualanDetail) TableName() string { return "trx_penjualan_detail" }
+
+// TrxPenjualanPengeluaranTest — Pencatatan pengeluaran BBM untuk keperluan pengujian/kalibrasi per shift.
+// Fields: JenisTest (FK), BBM (FK), QtyLiter, TotalRupiah.
+type TrxPenjualanPengeluaranTest struct {
+	ID          uint64     `gorm:"primaryKey;column:id" json:"id"`
+	PenjualanID uint64     `gorm:"column:penjualan_id;not null;index" json:"penjualan_id"`
+	JenisTestID uint       `gorm:"column:jenis_test_id;not null" json:"jenis_test_id"`
+	JenisTest   *JenisTest `gorm:"foreignKey:JenisTestID" json:"jenis_test,omitempty"`
+	BBMID       uint       `gorm:"column:bbm_id;not null" json:"bbm_id"`
+	BBM         *BBM       `gorm:"foreignKey:BBMID" json:"bbm,omitempty"`
+	QtyLiter    int64      `gorm:"column:qty_liter;type:bigint;not null;default:0" json:"qty_liter"`
+	TotalRupiah int64      `gorm:"column:total_rupiah;type:bigint;not null;default:0" json:"total_rupiah"`
+	CreatedAt   time.Time  `gorm:"column:created_at;autoCreateTime" json:"created_at"`
+	UpdatedAt   time.Time  `gorm:"column:updated_at;autoUpdateTime" json:"updated_at"`
+}
+
+func (TrxPenjualanPengeluaranTest) TableName() string { return "trx_penjualan_pengeluaran_test" }

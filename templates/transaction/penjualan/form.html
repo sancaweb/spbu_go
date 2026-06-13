@@ -1,8 +1,35 @@
 {{ define "transaction/penjualan/form.html" }} {{ template "header.html" . }}
 
-<!-- ── Embedded nozzle data ──────────────────────────────────────────────── -->
+<!-- Font Awesome -->
+<link
+  rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+/>
+
+<!-- ── Embedded data blocks ──────────────────────────────────────────────── -->
 <script type="application/json" id="nozzle-data">
   {{ .NozzleRows }}
+</script>
+<script type="application/json" id="form-meta">
+  {
+    "isEdit":          {{ if .IsEdit }}true{{ else }}false{{ end }},
+    "editID":          {{ if and .IsEdit .Penjualan }}{{ .Penjualan.ID }}{{ else }}0{{ end }},
+    "shiftID":         {{ if and .IsEdit .Penjualan }}{{ .Penjualan.ShiftID }}{{ else }}0{{ end }},
+    "totalPenerimaan": {{ if and .IsEdit .Penjualan }}{{ .Penjualan.TotalPenerimaan }}{{ else }}0{{ end }},
+    "aktualUang":      {{ if and .IsEdit .Penjualan }}{{ .Penjualan.AktualUang }}{{ else }}0{{ end }}
+  }
+</script>
+<script type="application/json" id="shifts-data">
+  [{{ range $i, $s := .Shifts }}{{ if $i }},{{ end }}{"id":{{ $s.ID }},"name":"{{ $s.ShiftName }}","time":"{{ $s.ShiftTime }}"}{{ end }}]
+</script>
+<script type="application/json" id="jenis-test-data">
+  {{ .JenisTestsJSON }}
+</script>
+<script type="application/json" id="bbm-data">
+  {{ .BBMsJSON }}
+</script>
+<script type="application/json" id="pengeluaran-test-data">
+  {{ .PengeluaranTestsJSON }}
 </script>
 
 <div
@@ -39,14 +66,90 @@
       <i class="fas fa-info-circle text-blue-500"></i> Informasi Shift
     </h2>
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      <!-- Shift -->
+      <!-- Waktu Mulai -->
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">
+          Waktu Mulai <span class="text-red-500">*</span>
+        </label>
+        <div class="relative">
+          <!-- Display: formatted Indonesian date -->
+          <div
+            class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white pointer-events-none"
+            :class="form.waktu_mulai ? 'text-gray-800' : 'text-gray-400'"
+          >
+            <i class="fas fa-calendar-alt mr-1 text-gray-400"></i>
+            <span
+              x-text="form.waktu_mulai ? formatWaktuID(form.waktu_mulai) : 'Pilih tanggal &amp; waktu'"
+            ></span>
+          </div>
+          <!-- Hidden datetime-local; z-index:2 ensures clicks reach it through overlay -->
+          <input
+            type="datetime-local"
+            x-model="form.waktu_mulai"
+            @change="onWaktuMulaiChange()"
+            style="z-index: 2"
+            class="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+            {{
+            if
+            .IsEdit
+            }}value="{{ if .Penjualan }}{{ formatWaktu .Penjualan.WaktuMulai }}{{ end }}"
+            {{
+            end
+            }}
+          />
+        </div>
+      </div>
+
+      <!-- Waktu Akhir -->
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">
+          Waktu Akhir <span class="text-red-500">*</span>
+        </label>
+        <div class="relative">
+          <!-- Display: formatted Indonesian date -->
+          <div
+            class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white pointer-events-none"
+            :class="form.waktu_akhir ? 'text-gray-800' : 'text-gray-400'"
+          >
+            <i class="fas fa-calendar-alt mr-1 text-gray-400"></i>
+            <span
+              x-text="form.waktu_akhir ? formatWaktuID(form.waktu_akhir) : 'Pilih tanggal &amp; waktu'"
+            ></span>
+          </div>
+          <!-- Hidden datetime-local; :min enforces cannot pick before waktu_mulai -->
+          <input
+            type="datetime-local"
+            x-model="form.waktu_akhir"
+            :min="form.waktu_mulai"
+            @change="autoDetectShift()"
+            style="z-index: 2"
+            class="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+            {{
+            if
+            .IsEdit
+            }}value="{{ if .Penjualan }}{{ formatWaktu .Penjualan.WaktuAkhir }}{{ end }}"
+            {{
+            end
+            }}
+          />
+        </div>
+      </div>
+
+      <!-- Shift (auto-detect) -->
       <div>
         <label class="block text-sm font-medium text-gray-600 mb-1">
           Shift <span class="text-red-500">*</span>
+          <span
+            x-show="shiftDetected"
+            class="ml-1 text-xs text-green-600 font-normal"
+            ><i class="fas fa-magic"></i> terdeteksi otomatis</span
+          >
         </label>
         <select
           x-model.number="form.shift_id"
+          @change="shiftDetected = false"
           class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+          :class="shiftDetected ? 'border-green-300 bg-green-50' : ''"
         >
           <option value="">-- Pilih Shift --</option>
           {{ range .Shifts }}
@@ -56,50 +159,10 @@
           {{ end }}
         </select>
       </div>
-
-      <!-- Waktu Mulai -->
-      <div>
-        <label class="block text-sm font-medium text-gray-600 mb-1">
-          Waktu Mulai <span class="text-red-500">*</span>
-        </label>
-        <input
-          type="datetime-local"
-          x-model="form.waktu_mulai"
-          class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-          {{
-          if
-          .IsEdit
-          }}
-          value="{{ if .Penjualan }}{{ formatWaktu .Penjualan.WaktuMulai }}{{ end }}"
-          {{
-          end
-          }}
-        />
-      </div>
-
-      <!-- Waktu Akhir -->
-      <div>
-        <label class="block text-sm font-medium text-gray-600 mb-1">
-          Waktu Akhir <span class="text-red-500">*</span>
-        </label>
-        <input
-          type="datetime-local"
-          x-model="form.waktu_akhir"
-          class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-          {{
-          if
-          .IsEdit
-          }}
-          value="{{ if .Penjualan }}{{ formatWaktu .Penjualan.WaktuAkhir }}{{ end }}"
-          {{
-          end
-          }}
-        />
-      </div>
     </div>
   </div>
 
-  <!-- ── Detail Nozzle Table ──────────────────────────────────────────────── -->
+  <!-- ── Detail Nozzle — Tiang Tabs ──────────────────────────────────────── -->
   <div
     class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 overflow-hidden"
   >
@@ -109,100 +172,284 @@
         Data Totalisator Nozzle
       </h2>
       <span class="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded">
-        Isi kolom Totalisator Awal &amp; Akhir untuk nozzle yang beroperasi
+        Isi Totalisator Awal &amp; Akhir untuk nozzle yang beroperasi
       </span>
     </div>
 
-    <div class="overflow-x-auto">
-      <table class="w-full text-sm">
-        <thead
-          class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider"
+    <!-- Tiang tab buttons -->
+    <div class="flex border-b border-gray-100 overflow-x-auto">
+      <template x-for="tg in tiangGroups" :key="'tab-' + tg.id">
+        <button
+          type="button"
+          @click="activeTab = 'tiang-' + tg.id"
+          :class="activeTab === 'tiang-' + tg.id
+            ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50/60 font-semibold'
+            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'"
+          class="px-5 py-3 text-sm whitespace-nowrap transition flex items-center gap-1.5"
         >
-          <tr>
-            <th class="px-3 py-3 text-left w-28">Tiang</th>
-            <th class="px-3 py-3 text-left w-20">Nozzle</th>
-            <th class="px-3 py-3 text-left">BBM</th>
-            <th class="px-3 py-3 text-right w-36">Harga / L</th>
-            <th class="px-3 py-3 text-right w-36">Tot. Awal</th>
-            <th class="px-3 py-3 text-right w-36">Tot. Akhir</th>
-            <th class="px-3 py-3 text-right w-32">Jml Liter</th>
-            <th class="px-3 py-3 text-right w-40">Jml Rupiah</th>
-          </tr>
-        </thead>
-        <tbody>
-          <template x-for="(row, idx) in rows" :key="row.nozzle_id">
-            <tr
-              :class="idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'"
-              class="border-t border-gray-100"
-            >
-              <td class="px-3 py-2 text-gray-600" x-text="row.tiang_name"></td>
-              <td class="px-3 py-2">
-                <span
-                  class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-semibold text-xs"
-                  x-text="row.description"
-                ></span>
-              </td>
-              <td class="px-3 py-2">
-                <span
-                  class="text-gray-800 font-medium"
-                  x-text="row.bbm_name"
-                ></span>
-              </td>
-              <td class="px-3 py-2 text-right text-gray-600">
-                Rp <span x-text="formatIDR(row.bbm_price)"></span>
-              </td>
-              <td class="px-3 py-2">
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  x-model.number="row.totalisator_awal"
-                  @input="calcRow(idx)"
-                  class="w-full border border-gray-200 rounded px-2 py-1 text-right text-sm focus:outline-none focus:ring-1 focus:ring-blue-300"
-                />
-              </td>
-              <td class="px-3 py-2">
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  x-model.number="row.totalisator_akhir"
-                  @input="calcRow(idx)"
-                  class="w-full border border-gray-200 rounded px-2 py-1 text-right text-sm focus:outline-none focus:ring-1 focus:ring-blue-300"
-                />
-              </td>
-              <td
-                class="px-3 py-2 text-right font-medium"
-                :class="row.jml_liter < 0 ? 'text-red-600' : 'text-gray-800'"
-                x-text="formatIDR(row.jml_liter)"
-              ></td>
-              <td class="px-3 py-2 text-right font-semibold text-blue-700">
-                Rp <span x-text="formatIDR(row.jml_rupiah)"></span>
-              </td>
-            </tr>
-          </template>
-          <template x-if="rows.length === 0">
+          <i class="fas fa-charging-station text-xs"></i>
+          <span x-text="tg.name"></span>
+          <span
+            class="ml-1 text-xs px-1.5 py-0.5 rounded-full"
+            :class="tiangHasSales(tg) ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400'"
+            x-text="tg.indices.length"
+          ></span>
+        </button>
+      </template>
+      <!-- Piutang B2B tab -->
+      <button
+        type="button"
+        @click="activeTab = 'piutang'"
+        :class="activeTab === 'piutang'
+          ? 'border-b-2 border-purple-500 text-purple-600 bg-purple-50/60 font-semibold'
+          : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'"
+        class="px-5 py-3 text-sm whitespace-nowrap transition flex items-center gap-1.5"
+      >
+        <i class="fas fa-file-invoice-dollar text-xs"></i>
+        Piutang B2B
+      </button>
+      <!-- Pengeluaran Test tab -->
+      <button
+        type="button"
+        @click="activeTab = 'pengeluaran-test'"
+        :class="activeTab === 'pengeluaran-test'
+          ? 'border-b-2 border-orange-500 text-orange-600 bg-orange-50/60 font-semibold'
+          : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'"
+        class="px-5 py-3 text-sm whitespace-nowrap transition flex items-center gap-1.5"
+      >
+        <i class="fas fa-flask text-xs"></i>
+        Pengeluaran Test
+        <span
+          x-show="pengeluaranTests.length > 0"
+          class="ml-1 text-xs px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-600"
+          x-text="pengeluaranTests.length"
+        ></span>
+      </button>
+    </div>
+
+    <!-- Tiang panels -->
+    <template x-for="tg in tiangGroups" :key="'panel-' + tg.id">
+      <div x-show="activeTab === 'tiang-' + tg.id" class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead
+            class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider"
+          >
             <tr>
-              <td colspan="8" class="px-4 py-8 text-center text-gray-400">
-                Tidak ada nozzle aktif yang terkonfigurasi
+              <th class="px-3 py-3 text-left w-20">Nozzle</th>
+              <th class="px-3 py-3 text-left">BBM</th>
+              <th class="px-3 py-3 text-right w-36">Harga / L</th>
+              <th class="px-3 py-3 text-right w-40">Tot. Awal</th>
+              <th class="px-3 py-3 text-right w-40">Tot. Akhir</th>
+              <th class="px-3 py-3 text-right w-32">Jml Liter</th>
+              <th class="px-3 py-3 text-right w-40">Jml Rupiah</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="(gi, gii) in tg.indices" :key="'r-' + gi">
+              <tr
+                :class="gii % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'"
+                class="border-t border-gray-100"
+              >
+                <td class="px-3 py-2">
+                  <span
+                    class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-semibold text-xs"
+                    x-text="rows[gi].description"
+                  ></span>
+                </td>
+                <td
+                  class="px-3 py-2 text-gray-800 font-medium"
+                  x-text="rows[gi].bbm_name"
+                ></td>
+                <td class="px-3 py-2 text-right text-gray-600">
+                  Rp <span x-text="formatIDR(rows[gi].bbm_price)"></span>
+                </td>
+                <td class="px-3 py-2">
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    x-model.number="rows[gi].totalisator_awal"
+                    @input="calcRow(gi)"
+                    class="w-full border border-gray-200 rounded px-2 py-1 text-right text-sm focus:outline-none focus:ring-1 focus:ring-blue-300"
+                  />
+                </td>
+                <td class="px-3 py-2">
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    x-model.number="rows[gi].totalisator_akhir"
+                    @input="calcRow(gi)"
+                    class="w-full border border-gray-200 rounded px-2 py-1 text-right text-sm focus:outline-none focus:ring-1 focus:ring-blue-300"
+                  />
+                </td>
+                <td
+                  class="px-3 py-2 text-right font-medium"
+                  :class="rows[gi].jml_liter < 0 ? 'text-red-600' : 'text-gray-800'"
+                  x-text="formatIDR(rows[gi].jml_liter)"
+                ></td>
+                <td class="px-3 py-2 text-right font-semibold text-blue-700">
+                  Rp <span x-text="formatIDR(rows[gi].jml_rupiah)"></span>
+                </td>
+              </tr>
+            </template>
+            <template x-if="tg.indices.length === 0">
+              <tr>
+                <td colspan="7" class="px-4 py-8 text-center text-gray-400">
+                  Tidak ada nozzle untuk tiang ini
+                </td>
+              </tr>
+            </template>
+          </tbody>
+          <tfoot class="bg-blue-50 font-semibold border-t-2 border-blue-200">
+            <tr>
+              <td
+                colspan="6"
+                class="px-3 py-3 text-right text-gray-700 uppercase text-xs tracking-wide"
+              >
+                Subtotal Tiang
+              </td>
+              <td class="px-3 py-3 text-right text-blue-700">
+                Rp <span x-text="formatIDR(tiangSubtotal(tg))"></span>
               </td>
             </tr>
-          </template>
-        </tbody>
-        <tfoot class="bg-blue-50 font-semibold border-t-2 border-blue-200">
-          <tr>
-            <td
-              colspan="7"
-              class="px-3 py-3 text-right text-gray-700 uppercase text-xs tracking-wide"
-            >
-              Total Penjualan (Totalisator)
-            </td>
-            <td class="px-3 py-3 text-right text-blue-700 text-base">
-              Rp <span x-text="formatIDR(form.total_rp_totalisator)"></span>
-            </td>
-          </tr>
-        </tfoot>
-      </table>
+          </tfoot>
+        </table>
+      </div>
+    </template>
+
+    <!-- Piutang B2B panel (placeholder) -->
+    <div x-show="activeTab === 'piutang'" class="p-8 text-center text-gray-400">
+      <i class="fas fa-file-invoice-dollar text-4xl mb-3 text-purple-200"></i>
+      <p class="text-sm italic">
+        Fitur penjualan kredit B2B akan tersedia pada versi berikutnya.
+      </p>
+    </div>
+
+    <!-- Pengeluaran Test panel -->
+    <div x-show="activeTab === 'pengeluaran-test'" class="p-4">
+      <div class="flex items-center justify-between mb-3">
+        <p class="text-sm text-gray-600">
+          Pengeluaran BBM untuk keperluan pengujian / kalibrasi nozzle pada
+          shift ini.
+        </p>
+        <button
+          type="button"
+          @click="addTestRow()"
+          class="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium rounded-lg transition"
+        >
+          <i class="fas fa-plus"></i> Tambah Baris
+        </button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead
+            class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider"
+          >
+            <tr>
+              <th class="px-3 py-2 text-left">Jenis Test</th>
+              <th class="px-3 py-2 text-left">Jenis BBM</th>
+              <th class="px-3 py-2 text-right w-32">Qty (Liter)</th>
+              <th class="px-3 py-2 text-right w-40">Total Rupiah</th>
+              <th class="px-3 py-2 w-10"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="(tr, ti) in pengeluaranTests" :key="ti">
+              <tr class="border-t border-gray-100">
+                <td class="px-3 py-2">
+                  <select
+                    x-model.number="tr.jenis_test_id"
+                    class="w-full border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-orange-300"
+                  >
+                    <option value="">-- Pilih --</option>
+                    <template x-for="jt in _jenisTestData" :key="jt.id">
+                      <option :value="jt.id" x-text="jt.nama_test"></option>
+                    </template>
+                  </select>
+                </td>
+                <td class="px-3 py-2">
+                  <select
+                    x-model.number="tr.bbm_id"
+                    @change="calcTestRow(ti)"
+                    class="w-full border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-orange-300"
+                  >
+                    <option value="">-- Pilih --</option>
+                    <template x-for="b in _bbmData" :key="b.id">
+                      <option :value="b.id" x-text="b.name"></option>
+                    </template>
+                  </select>
+                </td>
+                <td class="px-3 py-2">
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    x-model.number="tr.qty_liter"
+                    @input="calcTestRow(ti)"
+                    class="w-full border border-gray-200 rounded px-2 py-1 text-right text-sm focus:outline-none focus:ring-1 focus:ring-orange-300"
+                  />
+                </td>
+                <td class="px-3 py-2 text-right font-medium text-orange-700">
+                  Rp <span x-text="formatIDR(tr.total_rupiah)"></span>
+                </td>
+                <td class="px-3 py-2 text-center">
+                  <button
+                    type="button"
+                    @click="pengeluaranTests.splice(ti,1)"
+                    class="text-red-400 hover:text-red-600 transition"
+                  >
+                    <i class="fas fa-trash text-xs"></i>
+                  </button>
+                </td>
+              </tr>
+            </template>
+            <template x-if="pengeluaranTests.length === 0">
+              <tr>
+                <td
+                  colspan="5"
+                  class="px-4 py-6 text-center text-gray-400 text-xs italic"
+                >
+                  Belum ada baris pengeluaran test. Klik "Tambah Baris" untuk
+                  menambahkan.
+                </td>
+              </tr>
+            </template>
+          </tbody>
+          <tfoot
+            x-show="pengeluaranTests.length > 0"
+            class="bg-orange-50 border-t-2 border-orange-200"
+          >
+            <tr>
+              <td
+                colspan="3"
+                class="px-3 py-2 text-right text-gray-600 text-xs uppercase tracking-wide font-semibold"
+              >
+                Total Pengeluaran Test
+              </td>
+              <td class="px-3 py-2 text-right text-orange-700 font-bold">
+                Rp
+                <span
+                  x-text="formatIDR(pengeluaranTests.reduce(function(s,r){return s+(r.total_rupiah||0)},0))"
+                ></span>
+              </td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- Grand total footer (always visible) -->
+    <div
+      class="px-6 py-3 bg-blue-50 border-t-2 border-blue-200 flex items-center justify-between"
+    >
+      <span class="text-xs text-gray-600 uppercase tracking-wide font-semibold"
+        >Total Penjualan (Totalisator)</span
+      >
+      <span class="text-blue-700 font-bold text-base"
+        >Rp <span x-text="formatIDR(form.total_rp_totalisator)"></span
+      ></span>
     </div>
   </div>
 
@@ -296,62 +543,272 @@
 
 <script>
   (function () {
-    // Nozzle data dari server
+    // ── Parse embedded server data ────────────────────────────────────────
     var _nozzleData = [];
     try {
-      _nozzleData = JSON.parse(document.getElementById('nozzle-data').textContent || '[]');
-    } catch(e) {}
+      _nozzleData = JSON.parse(
+        document.getElementById("nozzle-data").textContent || "[]",
+      );
+    } catch (e) {}
 
-    // Edit mode: pre-filled header values
-    var _isEdit   = {{ if .IsEdit }}true{{ else }}false{{ end }};
-    var _editID   = {{ if .IsEdit }}{{ if .Penjualan }}{{ .Penjualan.ID }}{{ else }}0{{ end }}{{ else }}0{{ end }};
-    var _shiftID  = {{ if .IsEdit }}{{ if .Penjualan }}{{ .Penjualan.ShiftID }}{{ else }}0{{ end }}{{ else }}0{{ end }};
-    var _totPen   = {{ if .IsEdit }}{{ if .Penjualan }}{{ .Penjualan.TotalPenerimaan }}{{ else }}0{{ end }}{{ else }}0{{ end }};
-    var _aktual   = {{ if .IsEdit }}{{ if .Penjualan }}{{ .Penjualan.AktualUang }}{{ else }}0{{ end }}{{ else }}0{{ end }};
+    var _formMeta = {};
+    try {
+      _formMeta = JSON.parse(
+        document.getElementById("form-meta").textContent || "{}",
+      );
+    } catch (e) {}
+    var _isEdit = !!_formMeta.isEdit;
+    var _editID = _formMeta.editID || 0;
+    var _shiftID = _formMeta.shiftID || 0;
+    var _totPen = _formMeta.totalPenerimaan || 0;
+    var _aktual = _formMeta.aktualUang || 0;
 
-    document.addEventListener('alpine:init', function () {
-      Alpine.data('penjualanForm', function () {
+    var _shiftsData = [];
+    try {
+      _shiftsData = JSON.parse(
+        document.getElementById("shifts-data").textContent || "[]",
+      );
+    } catch (e) {}
+
+    var _jenisTestData = [];
+    try {
+      _jenisTestData = JSON.parse(
+        document.getElementById("jenis-test-data").textContent || "[]",
+      );
+    } catch (e) {}
+
+    var _bbmData = [];
+    try {
+      _bbmData = JSON.parse(
+        document.getElementById("bbm-data").textContent || "[]",
+      );
+    } catch (e) {}
+
+    var _pengeluaranTestData = [];
+    try {
+      _pengeluaranTestData = JSON.parse(
+        document.getElementById("pengeluaran-test-data").textContent || "[]",
+      );
+    } catch (e) {}
+
+    // ── Helper: build price lookup map from bbmData ───────────────────────
+    var _bbmPriceMap = {};
+    _bbmData.forEach(function (b) {
+      _bbmPriceMap[b.id] = b.price || 0;
+    });
+
+    document.addEventListener("alpine:init", function () {
+      Alpine.data("penjualanForm", function () {
         return {
           isSubmitting: false,
+          shiftDetected: false,
+          activeTab: "",
+          tiangGroups: [],
           rows: [],
+          pengeluaranTests: [],
+          _jenisTestData: _jenisTestData,
+          _bbmData: _bbmData,
           form: {
-            shift_id: _shiftID || '',
-            waktu_mulai: '',
-            waktu_akhir: '',
+            shift_id: _shiftID || "",
+            waktu_mulai: "",
+            waktu_akhir: "",
             total_penerimaan: _totPen,
             aktual_uang: _aktual,
             total_rp_totalisator: 0,
-            selisih: 0 - _totPen /* will recalc */
+            selisih: 0,
           },
 
           init: function () {
             var self = this;
-            // Clone nozzle rows from server data
+
+            // 1) Build rows from nozzle data
             self.rows = _nozzleData.map(function (n) {
               return Object.assign({}, n);
             });
-            // Initial calcs
-            self.rows.forEach(function (r, i) { self.calcRow(i); });
+
+            // 2) Build tiang groups for tabs
+            var groupMap = {};
+            var groupOrder = [];
+            self.rows.forEach(function (r, i) {
+              if (!groupMap[r.tiang_id]) {
+                groupMap[r.tiang_id] = {
+                  id: r.tiang_id,
+                  name: r.tiang_name,
+                  indices: [],
+                };
+                groupOrder.push(r.tiang_id);
+              }
+              groupMap[r.tiang_id].indices.push(i);
+            });
+            self.tiangGroups = groupOrder.map(function (id) {
+              return groupMap[id];
+            });
+            if (self.tiangGroups.length > 0) {
+              self.activeTab = "tiang-" + self.tiangGroups[0].id;
+            }
+
+            // 3) Pre-fill pengeluaran test for edit mode
+            if (_isEdit && _pengeluaranTestData.length > 0) {
+              self.pengeluaranTests = _pengeluaranTestData.map(function (pt) {
+                return {
+                  jenis_test_id: pt.jenis_test_id || 0,
+                  bbm_id: pt.bbm_id || 0,
+                  qty_liter: pt.qty_liter || 0,
+                  total_rupiah: pt.total_rupiah || 0,
+                };
+              });
+            }
+
+            // 4) Initial row calculations
+            self.rows.forEach(function (r, i) {
+              self.calcRow(i);
+            });
             self.calcSelisih();
 
-            // Pre-fill datetime inputs for edit mode
+            // 5) Sync datetime values for edit mode
             if (_isEdit) {
-              var mulaiEl = document.querySelector('input[type="datetime-local"]:nth-of-type(1)');
-              var akhirEl = document.querySelector('input[type="datetime-local"]:nth-of-type(2)');
-              // Values are set via 'value' attribute on the elements already; sync to Alpine model
-              var allDT = document.querySelectorAll('input[type="datetime-local"]');
-              if (allDT[0]) { self.form.waktu_mulai = allDT[0].value; }
-              if (allDT[1]) { self.form.waktu_akhir = allDT[1].value; }
+              var allDT = document.querySelectorAll(
+                'input[type="datetime-local"]',
+              );
+              if (allDT[0]) self.form.waktu_mulai = allDT[0].value;
+              if (allDT[1]) self.form.waktu_akhir = allDT[1].value;
             }
+
+            // 6) Auto-fill Totalisator Awal from last saved values (create mode only)
+            if (!_isEdit && self.rows.length > 0) {
+              fetch("/transaction/penjualan/last-totalisator")
+                .then(function (r) {
+                  return r.json();
+                })
+                .then(function (lastMap) {
+                  // lastMap: { "nozzle_id": totalisator_akhir }
+                  self.rows.forEach(function (row, i) {
+                    var last = lastMap[String(row.nozzle_id)];
+                    if (last !== undefined && last !== null && last > 0) {
+                      row.totalisator_awal = last;
+                      self.calcRow(i);
+                    }
+                  });
+                })
+                .catch(function () {
+                  /* ignore — non-critical */
+                });
+            }
+          },
+
+          // ── Tiang group helpers ─────────────────────────────────────────
+          tiangSubtotal: function (tg) {
+            var self = this;
+            return tg.indices.reduce(function (s, i) {
+              return s + (self.rows[i].jml_rupiah || 0);
+            }, 0);
+          },
+          tiangHasSales: function (tg) {
+            var self = this;
+            return tg.indices.some(function (i) {
+              return (self.rows[i].jml_liter || 0) > 0;
+            });
+          },
+
+          // ── Pengeluaran Test helpers ────────────────────────────────────
+          addTestRow: function () {
+            this.pengeluaranTests.push({
+              jenis_test_id: 0,
+              bbm_id: 0,
+              qty_liter: 0,
+              total_rupiah: 0,
+            });
+          },
+          calcTestRow: function (ti) {
+            var tr = this.pengeluaranTests[ti];
+            var price = _bbmPriceMap[tr.bbm_id] || 0;
+            tr.total_rupiah = (tr.qty_liter || 0) * price;
+          },
+
+          // ── Format datetime-local value to Indonesian display ───────────
+          formatWaktuID: function (val) {
+            if (!val) return "";
+            var months = [
+              "Januari",
+              "Februari",
+              "Maret",
+              "April",
+              "Mei",
+              "Juni",
+              "Juli",
+              "Agustus",
+              "September",
+              "Oktober",
+              "November",
+              "Desember",
+            ];
+            var parts = val.split("T");
+            if (parts.length < 2) return val;
+            var dp = parts[0].split("-");
+            var tp = parts[1].split(":");
+            if (dp.length < 3) return val;
+            return (
+              dp[2] +
+              "/" +
+              months[parseInt(dp[1], 10) - 1] +
+              "/" +
+              dp[0] +
+              ", " +
+              (tp[0] || "00") +
+              ":" +
+              (tp[1] || "00")
+            );
+          },
+
+          onWaktuMulaiChange: function () {
+            if (
+              this.form.waktu_akhir &&
+              this.form.waktu_akhir < this.form.waktu_mulai
+            ) {
+              this.form.waktu_akhir = "";
+            }
+            this.autoDetectShift();
+          },
+
+          autoDetectShift: function () {
+            var self = this;
+            if (!self.form.waktu_mulai || _shiftsData.length === 0) return;
+            function toMins(hhmm) {
+              var p = hhmm.trim().split(":");
+              return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
+            }
+            var dtParts = self.form.waktu_mulai.split("T");
+            if (dtParts.length < 2) return;
+            var timeMins = toMins(dtParts[1].substring(0, 5));
+            for (var i = 0; i < _shiftsData.length; i++) {
+              var s = _shiftsData[i];
+              if (!s.time) continue;
+              var rp = s.time.split("-");
+              if (rp.length < 2) continue;
+              var sm = toMins(rp[0]),
+                em = toMins(rp[1]);
+              var matched =
+                sm <= em
+                  ? timeMins >= sm && timeMins < em
+                  : timeMins >= sm || timeMins < em;
+              if (matched) {
+                self.form.shift_id = s.id;
+                self.shiftDetected = true;
+                return;
+              }
+            }
+            self.shiftDetected = false;
           },
 
           calcRow: function (idx) {
             var row = this.rows[idx];
-            row.jml_liter  = Math.max(0, (row.totalisator_akhir || 0) - (row.totalisator_awal || 0));
+            row.jml_liter = Math.max(
+              0,
+              (row.totalisator_akhir || 0) - (row.totalisator_awal || 0),
+            );
             row.jml_rupiah = row.jml_liter * (row.bbm_price || 0);
             this.calcTotal();
           },
-
           calcTotal: function () {
             var total = 0;
             for (var i = 0; i < this.rows.length; i++) {
@@ -360,39 +817,55 @@
             this.form.total_rp_totalisator = total;
             this.calcSelisih();
           },
-
           calcSelisih: function () {
-            this.form.selisih = (this.form.aktual_uang || 0) - this.form.total_rp_totalisator;
+            this.form.selisih =
+              (this.form.aktual_uang || 0) - this.form.total_rp_totalisator;
           },
 
           validate: function () {
-            if (!this.form.shift_id) return 'Shift harus dipilih';
-            if (!this.form.waktu_mulai) return 'Waktu mulai harus diisi';
-            if (!this.form.waktu_akhir) return 'Waktu akhir harus diisi';
-            var hasData = this.rows.some(function (r) { return r.jml_liter > 0; });
-            if (!hasData) return 'Minimal 1 nozzle harus memiliki data penjualan';
+            if (!this.form.shift_id) return "Shift harus dipilih";
+            if (!this.form.waktu_mulai) return "Waktu mulai harus diisi";
+            if (!this.form.waktu_akhir) return "Waktu akhir harus diisi";
+            if (
+              !this.rows.some(function (r) {
+                return r.jml_liter > 0;
+              })
+            )
+              return "Minimal 1 nozzle harus memiliki data penjualan";
             return null;
           },
 
           buildPayload: function () {
             var self = this;
             return {
-              shift_id:         Number(self.form.shift_id),
-              waktu_mulai:      self.form.waktu_mulai,
-              waktu_akhir:      self.form.waktu_akhir,
+              shift_id: Number(self.form.shift_id),
+              waktu_mulai: self.form.waktu_mulai,
+              waktu_akhir: self.form.waktu_akhir,
               total_penerimaan: self.form.total_penerimaan,
-              aktual_uang:      self.form.aktual_uang,
-              details:          self.rows.map(function (r) {
+              aktual_uang: self.form.aktual_uang,
+              details: self.rows.map(function (r) {
                 return {
-                  nozzle_id:         r.nozzle_id,
-                  tiang_id:          r.tiang_id,
-                  bbm_id:            r.bbm_id,
-                  bbm_price:         r.bbm_price,
-                  margin:            r.margin,
-                  totalisator_awal:  r.totalisator_awal  || 0,
-                  totalisator_akhir: r.totalisator_akhir || 0
+                  nozzle_id: r.nozzle_id,
+                  tiang_id: r.tiang_id,
+                  bbm_id: r.bbm_id,
+                  bbm_price: r.bbm_price,
+                  margin: r.margin,
+                  totalisator_awal: r.totalisator_awal || 0,
+                  totalisator_akhir: r.totalisator_akhir || 0,
                 };
-              })
+              }),
+              pengeluaran_tests: self.pengeluaranTests
+                .filter(function (pt) {
+                  return pt.jenis_test_id && pt.bbm_id && pt.qty_liter > 0;
+                })
+                .map(function (pt) {
+                  return {
+                    jenis_test_id: Number(pt.jenis_test_id),
+                    bbm_id: Number(pt.bbm_id),
+                    qty_liter: Number(pt.qty_liter),
+                    total_rupiah: Number(pt.total_rupiah),
+                  };
+                }),
             };
           },
 
@@ -400,38 +873,50 @@
             var self = this;
             var err = self.validate();
             if (err) {
-              Swal.fire({ icon: 'warning', title: 'Periksa Form', text: err });
+              Swal.fire({ icon: "warning", title: "Periksa Form", text: err });
               return;
             }
             self.isSubmitting = true;
-            var url = _isEdit ? '/transaction/penjualan/' + _editID : '/transaction/penjualan';
+            var url = _isEdit
+              ? "/transaction/penjualan/" + _editID
+              : "/transaction/penjualan";
             fetch(url, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(self.buildPayload())
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(self.buildPayload()),
             })
-            .then(function (r) { return r.json(); })
-            .then(function (res) {
-              self.isSubmitting = false;
-              if (res.status === 'success') {
+              .then(function (r) {
+                return r.json();
+              })
+              .then(function (res) {
+                self.isSubmitting = false;
+                if (res.status === "success") {
+                  Swal.fire({
+                    icon: "success",
+                    title: "Berhasil",
+                    text: res.message,
+                    timer: 1600,
+                    showConfirmButton: false,
+                  }).then(function () {
+                    window.location.href = "/transaction/penjualan";
+                  });
+                } else {
+                  Swal.fire({
+                    icon: "error",
+                    title: "Gagal",
+                    text: res.message || "Terjadi kesalahan",
+                  });
+                }
+              })
+              .catch(function (e) {
+                self.isSubmitting = false;
                 Swal.fire({
-                  icon: 'success',
-                  title: 'Berhasil',
-                  text: res.message,
-                  timer: 1600,
-                  showConfirmButton: false
-                }).then(function () {
-                  window.location.href = '/transaction/penjualan';
+                  icon: "error",
+                  title: "Error",
+                  text: "Gagal menghubungi server: " + e.message,
                 });
-              } else {
-                Swal.fire({ icon: 'error', title: 'Gagal', text: res.message || 'Terjadi kesalahan' });
-              }
-            })
-            .catch(function (e) {
-              self.isSubmitting = false;
-              Swal.fire({ icon: 'error', title: 'Error', text: 'Gagal menghubungi server: ' + e.message });
-            });
-          }
+              });
+          },
         };
       });
     });

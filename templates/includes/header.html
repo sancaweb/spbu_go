@@ -235,6 +235,10 @@
                 <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
                 Tiang & Nozzle
             </a>
+            <a href="/master/jenis-test" class="sidebar-link {{ if eq .ActiveMenu "master_jenis_test" }}active{{ end }}">
+                <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+                Jenis Test
+            </a>
 
             <!-- Keuangan Sub-menu -->
             <div x-data="{ keuOpen: {{ or (eq .ActiveMenu "keuangan_wallet") (eq .ActiveMenu "keuangan_coa") (eq .ActiveMenu "keuangan_coa_mapping") false }} }">
@@ -265,8 +269,8 @@
             <div class="sidebar-section-title">Transaksi</div>
 
             <!-- Penebusan Sub-menu -->
-            <div x-data="{ penebusanOpen: {{ or (eq .ActiveMenu "trans_penebusan") (eq .ActiveMenu "trans_stok_do") (eq .ActiveMenu "trans_kedatangan_bbm") (eq .ActiveMenu "trans_penjualan") false }} }">
-                <button @click="penebusanOpen = !penebusanOpen" class="sidebar-link w-full justify-between {{ if or (eq .ActiveMenu "trans_penebusan") (eq .ActiveMenu "trans_stok_do") (eq .ActiveMenu "trans_kedatangan_bbm") (eq .ActiveMenu "trans_penjualan") }}active{{ end }}">
+            <div x-data="{ penebusanOpen: {{ or (eq .ActiveMenu "trans_penebusan") (eq .ActiveMenu "trans_stok_do") (eq .ActiveMenu "trans_kedatangan_bbm") false }} }">
+                <button @click="penebusanOpen = !penebusanOpen" class="sidebar-link w-full justify-between {{ if or (eq .ActiveMenu "trans_penebusan") (eq .ActiveMenu "trans_stok_do") (eq .ActiveMenu "trans_kedatangan_bbm") }}active{{ end }}">
                     <div class="flex items-center gap-3">
                         <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                         Penebusan
@@ -286,9 +290,51 @@
                         <svg class="icon w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
                         Kedatangan BBM
                     </a>
+                </div>
+            </div>
+
+            <!-- Penjualan Sub-menu -->
+            <div x-data="{ penjualanOpen: {{ or (eq .ActiveMenu "trans_penjualan") (eq .ActiveMenu "trans_penyusutan") false }} }">
+                <button @click="penjualanOpen = !penjualanOpen" class="sidebar-link w-full justify-between {{ if or (eq .ActiveMenu "trans_penjualan") (eq .ActiveMenu "trans_penyusutan") }}active{{ end }}">
+                    <div class="flex items-center gap-3">
+                        <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                        Penjualan
+                    </div>
+                    <svg class="w-4 h-4 transition-transform" :class="{'rotate-90': penjualanOpen}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </button>
+                <div x-show="penjualanOpen" x-transition class="pl-8 mt-1 space-y-1">
                     <a href="/transaction/penjualan" class="sidebar-link text-sm {{ if eq .ActiveMenu "trans_penjualan" }}active{{ end }}">
-                        <svg class="icon w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-                        Penjualan BBM
+                        <svg class="icon w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                        Input Penjualan
+                    </a>
+                    <a href="/transaction/penyusutan" class="sidebar-link text-sm {{ if eq .ActiveMenu "trans_penyusutan" }}active{{ end }}">
+                        <svg class="icon w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path></svg>
+                        Penyusutan
+                    </a>
+                </div>
+            </div>
+
+            <!-- Piutang B2B Sub-menu -->
+            <div x-data="{ piutangOpen: {{ or (eq .ActiveMenu "piutang_data") (eq .ActiveMenu "piutang_rincian") (eq .ActiveMenu "piutang_rekap") false }} }">
+                <button @click="piutangOpen = !piutangOpen" class="sidebar-link w-full justify-between {{ if or (eq .ActiveMenu "piutang_data") (eq .ActiveMenu "piutang_rincian") (eq .ActiveMenu "piutang_rekap") }}active{{ end }}">
+                    <div class="flex items-center gap-3">
+                        <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m5.99 5.99h.01M5 5h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z"></path></svg>
+                        Piutang B2B
+                    </div>
+                    <svg class="w-4 h-4 transition-transform" :class="{'rotate-90': piutangOpen}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </button>
+                <div x-show="piutangOpen" x-transition class="pl-8 mt-1 space-y-1">
+                    <a href="/transaction/piutang" class="sidebar-link text-sm {{ if eq .ActiveMenu "piutang_data" }}active{{ end }}">
+                        <svg class="icon w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                        Data Piutang
+                    </a>
+                    <a href="/transaction/piutang/rincian" class="sidebar-link text-sm {{ if eq .ActiveMenu "piutang_rincian" }}active{{ end }}">
+                        <svg class="icon w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h10M4 18h7"></path></svg>
+                        Rincian Piutang
+                    </a>
+                    <a href="/transaction/piutang/rekap" class="sidebar-link text-sm {{ if eq .ActiveMenu "piutang_rekap" }}active{{ end }}">
+                        <svg class="icon w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3v18m4-14h2a3 3 0 010 6h-2m0-6v6m0 0h3a3 3 0 010 6h-3"></path></svg>
+                        Rekap Piutang
                     </a>
                 </div>
             </div>

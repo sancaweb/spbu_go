@@ -461,7 +461,101 @@ func main() {
 		jml_rupiah          BIGINT      NOT NULL DEFAULT 0
 	)`)
 
+	// Create trx_piutang table (header piutang B2B per partner)
+	database.DB.Exec(`CREATE TABLE IF NOT EXISTS trx_piutang (
+		id_piutang    BIGSERIAL       PRIMARY KEY,
+		penjualan_id  BIGINT          NOT NULL REFERENCES trx_penjualan(id_penjualan) ON DELETE RESTRICT,
+		pelanggan_id  INT             NOT NULL REFERENCES partners(id) ON DELETE RESTRICT,
+		total_tagihan BIGINT          NOT NULL DEFAULT 0,
+		status        VARCHAR(10)     NOT NULL DEFAULT 'unpaid',
+		isinvoiced    BOOLEAN         DEFAULT FALSE,
+		created       TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		created_by    INT             NULL REFERENCES users(id) ON DELETE SET NULL,
+		updated       TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_by    INT             NULL REFERENCES users(id) ON DELETE SET NULL
+	)`)
+	database.DB.Exec(`DO $$ BEGIN
+		IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='trx_piutang' AND column_name='partner_id')
+		   AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='trx_piutang' AND column_name='pelanggan_id') THEN
+			ALTER TABLE trx_piutang RENAME COLUMN partner_id TO pelanggan_id;
+		END IF;
+		IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='trx_piutang' AND column_name='is_invoiced')
+		   AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='trx_piutang' AND column_name='isinvoiced') THEN
+			ALTER TABLE trx_piutang RENAME COLUMN is_invoiced TO isinvoiced;
+		END IF;
+	END $$`)
+
+	// Create trx_piutang_detail table (voucher per kendaraan)
+	database.DB.Exec(`CREATE TABLE IF NOT EXISTS trx_piutang_detail (
+		id_piutang_detail BIGSERIAL   PRIMARY KEY,
+		piutang_id        BIGINT      NOT NULL REFERENCES trx_piutang(id_piutang) ON DELETE CASCADE,
+		penjualan_id      BIGINT      NOT NULL REFERENCES trx_penjualan(id_penjualan) ON DELETE RESTRICT,
+		no_voucher        VARCHAR(50),
+		no_pol            VARCHAR(20),
+		driver_name       VARCHAR(100),
+		bbm_id            INT         NOT NULL REFERENCES bbm(id) ON DELETE RESTRICT,
+		harga_bbm         BIGINT      NOT NULL DEFAULT 0,
+		margin            BIGINT      NOT NULL DEFAULT 0,
+		qty_liter         BIGINT      NOT NULL DEFAULT 0,
+		total_line        BIGINT      NOT NULL DEFAULT 0,
+		created           TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		created_by        INT         NULL REFERENCES users(id) ON DELETE SET NULL,
+		updated           TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_by        INT         NULL REFERENCES users(id) ON DELETE SET NULL
+	)`)
+
 	log.Println("Manual migration completed")
+
+	// Create trx_penyusutan table (penyusutan/susut BBM harian)
+	database.DB.Exec(`CREATE TABLE IF NOT EXISTS trx_penyusutan (
+		id_penyusutan   BIGSERIAL       PRIMARY KEY,
+		no_penyusutan   VARCHAR(25)     NOT NULL,
+		tgl_penyusutan  DATE            NOT NULL,
+		shift_id        INT             NOT NULL REFERENCES shifts(id) ON DELETE RESTRICT,
+		bbm_id          INT             NOT NULL REFERENCES bbm(id) ON DELETE RESTRICT,
+		jml_liter       BIGINT          NOT NULL DEFAULT 0,
+		harga_dasar     BIGINT          NOT NULL DEFAULT 0,
+		nilai_rupiah    BIGINT          NOT NULL DEFAULT 0,
+		keterangan      TEXT,
+		created         TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		created_by      INT             NULL REFERENCES users(id) ON DELETE SET NULL,
+		updated         TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_by      INT             NULL REFERENCES users(id) ON DELETE SET NULL,
+		CONSTRAINT uni_trx_penyusutan_no_penyusutan UNIQUE (no_penyusutan)
+	)`)
+
+	// Create jenis_test table (master data jenis pengujian/kalibrasi BBM)
+	database.DB.Exec(`CREATE TABLE IF NOT EXISTS jenis_test (
+		id          SERIAL PRIMARY KEY,
+		nama_test   VARCHAR(100) NOT NULL,
+		deskripsi   TEXT,
+		is_active   BOOLEAN DEFAULT TRUE,
+		created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		deleted_at  TIMESTAMP NULL
+	)`)
+
+	// Create trx_penjualan_pengeluaran_test table (pengeluaran BBM untuk tes/kalibrasi per shift)
+	database.DB.Exec(`CREATE TABLE IF NOT EXISTS trx_penjualan_pengeluaran_test (
+		id              BIGSERIAL   PRIMARY KEY,
+		penjualan_id    BIGINT      NOT NULL REFERENCES trx_penjualan(id_penjualan) ON DELETE CASCADE,
+		jenis_test_id   INT         NOT NULL REFERENCES jenis_test(id) ON DELETE RESTRICT,
+		bbm_id          INT         NOT NULL REFERENCES bbm(id) ON DELETE RESTRICT,
+		qty_liter       BIGINT      NOT NULL DEFAULT 0,
+		total_rupiah    BIGINT      NOT NULL DEFAULT 0,
+		created_at      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
+	)`)
+
+	// Rename old penyusutan unique constraint to GORM-expected name (handles existing DBs)
+	database.DB.Exec(`DO $$ BEGIN
+		IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uni_trx_penyusutan_no_penyusutan')
+		   AND NOT EXISTS (SELECT 1 FROM pg_class WHERE relname = 'uni_trx_penyusutan_no_penyusutan') THEN
+			IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uni_trx_penyusutan_no') THEN
+				ALTER TABLE trx_penyusutan RENAME CONSTRAINT uni_trx_penyusutan_no TO uni_trx_penyusutan_no_penyusutan;
+			END IF;
+		END IF;
+	END $$`)
 
 	// Auto Migrate (enabled for easier setup)
 	if err := database.DB.AutoMigrate(
@@ -490,6 +584,11 @@ func main() {
 		&entity.TrxKedatanganBBM{},
 		&entity.TrxPenjualan{},
 		&entity.TrxPenjualanDetail{},
+		&entity.TrxPenyusutan{},
+		&entity.JenisTest{},
+		&entity.TrxPenjualanPengeluaranTest{},
+		&entity.TrxPiutang{},
+		&entity.TrxPiutangDetail{},
 	); err != nil {
 		log.Fatalf("Gagal melakukan migrasi database: %v", err)
 	}
@@ -544,6 +643,8 @@ func main() {
 	shiftService := service.NewShiftService(shiftRepo)
 	kedatanganRepo := repository.NewKedatanganBBMRepository(database.DB)
 	kedatanganService := service.NewKedatanganBBMService(kedatanganRepo)
+	jenisTestRepo := repository.NewJenisTestRepository(database.DB)
+	jenisTestService := service.NewJenisTestService(jenisTestRepo)
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(authService)
@@ -566,7 +667,11 @@ func main() {
 	kedatanganBBMHandler := handler.NewKedatanganBBMHandler(kedatanganService, shiftService)
 	penjualanRepo := repository.NewPenjualanRepository(database.DB)
 	penjualanService := service.NewPenjualanService(penjualanRepo, accountingService)
-	penjualanHandler := handler.NewPenjualanHandler(penjualanService, tiangService, shiftService, settingService)
+	penjualanHandler := handler.NewPenjualanHandler(penjualanService, tiangService, shiftService, settingService, jenisTestService, bbmService)
+	jenisTestHandler := handler.NewJenisTestHandler(jenisTestService)
+	piutangRepo := repository.NewPiutangRepository(database.DB)
+	piutangService := service.NewPiutangService(piutangRepo, accountingService)
+	piutangHandler := handler.NewPiutangHandler(piutangService, partnerService, penjualanService, bbmService)
 
 	// 5. Setup Router
 	r := server.NewRouter()
@@ -724,6 +829,14 @@ func main() {
 				shift.POST("/:id", shiftHandler.Update)
 				shift.POST("/:id/delete", shiftHandler.Delete)
 			}
+			jenisTest := master.Group("/jenis-test")
+			{
+				jenisTest.GET("", jenisTestHandler.Index)
+				jenisTest.POST("", jenisTestHandler.Create)
+				jenisTest.POST("/:id", jenisTestHandler.Update)
+				jenisTest.POST("/:id/toggle", jenisTestHandler.ToggleActive)
+				jenisTest.POST("/:id/delete", jenisTestHandler.Delete)
+			}
 			keuangan := master.Group("/keuangan")
 			{
 				walletRoutes := keuangan.Group("/wallet")
@@ -773,11 +886,28 @@ func main() {
 			transaction.GET("/penjualan", penjualanHandler.Index)
 			transaction.POST("/penjualan/datatable", penjualanHandler.Datatable)
 			transaction.GET("/penjualan/create", penjualanHandler.FormCreate)
+			// last-totalisator harus SEBELUM /:id route agar tidak ditangkap sebagai param
+			transaction.GET("/penjualan/last-totalisator", penjualanHandler.LastTotalisator)
 			transaction.POST("/penjualan", penjualanHandler.Create)
 			transaction.GET("/penjualan/:id/edit", penjualanHandler.FormEdit)
 			transaction.GET("/penjualan/:id/detail", penjualanHandler.GetDetail)
 			transaction.POST("/penjualan/:id", penjualanHandler.Update)
 			transaction.POST("/penjualan/:id/delete", penjualanHandler.Delete)
+
+			// Piutang B2B — tagihan penjualan kredit ke partner
+			transaction.GET("/piutang", piutangHandler.Index)
+			transaction.GET("/piutang/rincian", piutangHandler.Rincian)
+			transaction.GET("/piutang/rekap", piutangHandler.Rekap)
+			transaction.GET("/piutang/summary", piutangHandler.Summary)
+			transaction.GET("/piutang/rekap/grouped", piutangHandler.RekapGrouped)
+			transaction.GET("/piutang-summary", piutangHandler.Summary)
+			transaction.POST("/piutang/datatable", piutangHandler.Datatable)
+			transaction.POST("/piutang/rincian/datatable", piutangHandler.DatatableRincian)
+			transaction.POST("/piutang/rekap/datatable", piutangHandler.DatatableRekap)
+			transaction.GET("/piutang/:id/detail", piutangHandler.GetDetail)
+			transaction.POST("/piutang", piutangHandler.Create)
+			transaction.POST("/piutang/:id/lunas", piutangHandler.Lunas)
+			transaction.POST("/piutang/:id/delete", piutangHandler.Delete)
 
 			// Stok DO — tracking pengiriman BBM per nomor SO
 			transaction.GET("/stok-do", penebusanHandler.StokDOIndex)

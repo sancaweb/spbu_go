@@ -18,6 +18,9 @@ type PenjualanRepository interface {
 	Create(p *entity.TrxPenjualan) error
 	Update(p *entity.TrxPenjualan) error
 	Delete(id uint64) error
+	// GetLastTotalisatorByNozzle mengembalikan map nozzle_id → totalisator_akhir terakhir.
+	// Dipakai untuk auto-fill Totalisator Awal di form create penjualan baru.
+	GetLastTotalisatorByNozzle() (map[uint]int64, error)
 }
 
 type penjualanRepository struct {
@@ -52,6 +55,9 @@ func (r *penjualanRepository) FindAll() ([]entity.TrxPenjualan, error) {
 		Preload("Details.Tiang").
 		Preload("Details.Nozzle").
 		Preload("Details.BBM").
+		Preload("PengeluaranTests").
+		Preload("PengeluaranTests.JenisTest").
+		Preload("PengeluaranTests.BBM").
 		Order("waktu_mulai DESC, id_penjualan DESC").
 		Find(&list).Error
 	return list, err
@@ -67,6 +73,9 @@ func (r *penjualanRepository) FindByID(id uint64) (*entity.TrxPenjualan, error) 
 		Preload("Details.Tiang").
 		Preload("Details.Nozzle").
 		Preload("Details.BBM").
+		Preload("PengeluaranTests").
+		Preload("PengeluaranTests.JenisTest").
+		Preload("PengeluaranTests.BBM").
 		First(&p, id).Error
 	if err != nil {
 		return nil, err
@@ -88,6 +97,20 @@ func (r *penjualanRepository) Datatable(req dto.DatatableRequest) (int64, int64,
 		q := "%" + req.Search.Value + "%"
 		conditions = append(conditions, "(p.no_penjualan ILIKE ? OR s.shift_name ILIKE ?)")
 		args = append(args, q, q)
+	}
+
+	// Custom filters (sent as extra POST fields alongside DataTables payload)
+	if req.FilterNoForm != "" {
+		conditions = append(conditions, "p.no_penjualan ILIKE ?")
+		args = append(args, "%"+req.FilterNoForm+"%")
+	}
+	if req.FilterTanggal != "" {
+		conditions = append(conditions, "DATE(p.waktu_mulai) = ?")
+		args = append(args, req.FilterTanggal)
+	}
+	if req.FilterShiftID > 0 {
+		conditions = append(conditions, "p.shift_id = ?")
+		args = append(args, req.FilterShiftID)
 	}
 
 	whereSQL := ""
@@ -163,7 +186,7 @@ func (r *penjualanRepository) Create(p *entity.TrxPenjualan) error {
 		return tx.Error
 	}
 
-	if err := tx.Omit("Shift", "Creator", "Updater", "Details.Tiang", "Details.Nozzle", "Details.BBM").
+	if err := tx.Omit("Shift", "Creator", "Updater", "Details", "PengeluaranTests").
 		Create(p).Error; err != nil {
 		tx.Rollback()
 		return err
@@ -180,6 +203,17 @@ func (r *penjualanRepository) Create(p *entity.TrxPenjualan) error {
 		}
 	}
 
+	// Simpan pengeluaran test
+	for i := range p.PengeluaranTests {
+		p.PengeluaranTests[i].PenjualanID = p.ID
+	}
+	if len(p.PengeluaranTests) > 0 {
+		if err := tx.Omit("JenisTest", "BBM").Create(&p.PengeluaranTests).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
 	return tx.Commit().Error
 }
 
@@ -190,7 +224,7 @@ func (r *penjualanRepository) Update(p *entity.TrxPenjualan) error {
 	}
 
 	// Update header
-	if err := tx.Omit("Shift", "Creator", "Updater", "Details").
+	if err := tx.Omit("Shift", "Creator", "Updater", "Details", "PengeluaranTests").
 		Save(p).Error; err != nil {
 		tx.Rollback()
 		return err
@@ -212,9 +246,53 @@ func (r *penjualanRepository) Update(p *entity.TrxPenjualan) error {
 		}
 	}
 
+	// Hapus pengeluaran test lama, simpan yang baru
+	if err := tx.Where("penjualan_id = ?", p.ID).Delete(&entity.TrxPenjualanPengeluaranTest{}).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+	if len(p.PengeluaranTests) > 0 {
+		for i := range p.PengeluaranTests {
+			p.PengeluaranTests[i].PenjualanID = p.ID
+			p.PengeluaranTests[i].ID = 0
+		}
+		if err := tx.Omit("JenisTest", "BBM").Create(&p.PengeluaranTests).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
 	return tx.Commit().Error
 }
 
 func (r *penjualanRepository) Delete(id uint64) error {
 	return r.db.Delete(&entity.TrxPenjualan{}, id).Error
+}
+
+// nozzleLastTot — row helper untuk GetLastTotalisatorByNozzle.
+type nozzleLastTot struct {
+	NozzleID         uint  `gorm:"column:nozzle_id"`
+	TotalisatorAkhir int64 `gorm:"column:totalisator_akhir"`
+}
+
+// GetLastTotalisatorByNozzle mengembalikan map nozzle_id → totalisator_akhir terakhir
+// berdasarkan waktu_akhir transaksi penjualan.
+func (r *penjualanRepository) GetLastTotalisatorByNozzle() (map[uint]int64, error) {
+	var rows []nozzleLastTot
+	err := r.db.Raw(`
+		SELECT DISTINCT ON (d.nozzle_id)
+			d.nozzle_id,
+			d.totalisator_akhir
+		FROM trx_penjualan_detail d
+		JOIN trx_penjualan p ON p.id_penjualan = d.penjualan_id
+		ORDER BY d.nozzle_id, p.waktu_akhir DESC, p.id_penjualan DESC
+	`).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[uint]int64, len(rows))
+	for _, row := range rows {
+		result[row.NozzleID] = row.TotalisatorAkhir
+	}
+	return result, nil
 }

@@ -23,6 +23,16 @@ type DatatableRequest struct {
 			Regex string `form:"regex"`
 		} `form:"search"`
 	} `form:"columns"`
+
+	// Custom filter fields for modules that extend the DataTables POST payload.
+	FilterNoForm           string `form:"filter_no_form"`
+	FilterTanggal          string `form:"filter_tanggal"` // YYYY-MM-DD
+	FilterShiftID          uint   `form:"filter_shift_id"`
+	FilterPartnerID        uint   `form:"filter_partner_id"`
+	FilterWaktuMulai       string `form:"filter_waktu_mulai"` // YYYY-MM-DD
+	FilterWaktuAkhir       string `form:"filter_waktu_akhir"` // YYYY-MM-DD
+	FilterStatusPembayaran string `form:"filter_status_pembayaran"`
+	FilterStatusKesesuaian string `form:"filter_status_kesesuaian"` // sesuai|tidak_sesuai
 }
 
 // DatatableResponse standardizes the JSON response expected by jQuery DataTables

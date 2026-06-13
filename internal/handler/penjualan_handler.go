@@ -28,13 +28,21 @@ type penjualanDetailReq struct {
 	TotalisatorAkhir int64 `json:"totalisator_akhir"`
 }
 
+type pengeluaranTestReq struct {
+	JenisTestID uint  `json:"jenis_test_id"`
+	BBMID       uint  `json:"bbm_id"`
+	QtyLiter    int64 `json:"qty_liter"`
+	TotalRupiah int64 `json:"total_rupiah"`
+}
+
 type penjualanRequest struct {
-	ShiftID         uint                 `json:"shift_id"`
-	WaktuMulai      string               `json:"waktu_mulai"` // "2006-01-02T15:04"
-	WaktuAkhir      string               `json:"waktu_akhir"`
-	TotalPenerimaan int64                `json:"total_penerimaan"`
-	AktualUang      int64                `json:"aktual_uang"`
-	Details         []penjualanDetailReq `json:"details"`
+	ShiftID          uint                 `json:"shift_id"`
+	WaktuMulai       string               `json:"waktu_mulai"` // "2006-01-02T15:04"
+	WaktuAkhir       string               `json:"waktu_akhir"`
+	TotalPenerimaan  int64                `json:"total_penerimaan"`
+	AktualUang       int64                `json:"aktual_uang"`
+	Details          []penjualanDetailReq `json:"details"`
+	PengeluaranTests []pengeluaranTestReq `json:"pengeluaran_tests"`
 }
 
 // ─── Form data helper (untuk template) ───────────────────────────────────────
@@ -61,6 +69,8 @@ type PenjualanHandler struct {
 	tiangSvc     service.TiangService
 	shiftSvc     service.ShiftService
 	settingSvc   service.SettingService
+	jenisTestSvc service.JenisTestService
+	bbmSvc       service.BBMService
 }
 
 func NewPenjualanHandler(
@@ -68,12 +78,16 @@ func NewPenjualanHandler(
 	tiangSvc service.TiangService,
 	shiftSvc service.ShiftService,
 	settingSvc service.SettingService,
+	jenisTestSvc service.JenisTestService,
+	bbmSvc service.BBMService,
 ) *PenjualanHandler {
 	return &PenjualanHandler{
 		penjualanSvc: penjualanSvc,
 		tiangSvc:     tiangSvc,
 		shiftSvc:     shiftSvc,
 		settingSvc:   settingSvc,
+		jenisTestSvc: jenisTestSvc,
+		bbmSvc:       bbmSvc,
 	}
 }
 
@@ -192,6 +206,19 @@ func parsePenjualanRequest(req penjualanRequest, userID *uint) (*entity.TrxPenju
 		return nil, fmt.Errorf("tidak ada nozzle dengan data penjualan (totalisator akhir harus > awal)")
 	}
 
+	// Proses pengeluaran test (optional)
+	for _, pt := range req.PengeluaranTests {
+		if pt.JenisTestID == 0 || pt.BBMID == 0 || pt.QtyLiter <= 0 {
+			continue
+		}
+		p.PengeluaranTests = append(p.PengeluaranTests, entity.TrxPenjualanPengeluaranTest{
+			JenisTestID: pt.JenisTestID,
+			BBMID:       pt.BBMID,
+			QtyLiter:    pt.QtyLiter,
+			TotalRupiah: pt.TotalRupiah,
+		})
+	}
+
 	p.Selisih = p.AktualUang - p.TotalRpTotalisator
 	return p, nil
 }
@@ -202,11 +229,13 @@ func parsePenjualanRequest(req penjualanRequest, userID *uint) (*entity.TrxPenju
 func (h *PenjualanHandler) Index(c *gin.Context) {
 	user, _ := c.Get("user")
 	favicon, _ := c.Get("favicon")
+	shifts, _ := h.shiftSvc.GetAll()
 	c.HTML(http.StatusOK, "transaction/penjualan/index.html", gin.H{
 		"User":       user,
 		"Favicon":    favicon,
 		"Title":      "Penjualan BBM",
 		"ActiveMenu": "trans_penjualan",
+		"Shifts":     shifts,
 	})
 }
 
@@ -217,6 +246,18 @@ func (h *PenjualanHandler) Datatable(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, dto.DatatableResponse{Error: err.Error()})
 		return
 	}
+
+	// Explicitly read custom filter fields.
+	// c.ShouldBind may not capture flat custom fields when mixed with
+	// DataTables' bracket-notation nested form fields (e.g. columns[0][data]).
+	req.FilterNoForm = c.PostForm("filter_no_form")
+	req.FilterTanggal = c.PostForm("filter_tanggal")
+	if sidStr := c.PostForm("filter_shift_id"); sidStr != "" {
+		if sid, err := strconv.ParseUint(sidStr, 10, 32); err == nil {
+			req.FilterShiftID = uint(sid)
+		}
+	}
+
 	total, filtered, rows, err := h.penjualanSvc.Datatable(req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.DatatableResponse{Error: err.Error()})
@@ -242,17 +283,25 @@ func (h *PenjualanHandler) FormCreate(c *gin.Context) {
 	}
 
 	shifts, _ := h.shiftSvc.GetAll()
+	jenisTests, _ := h.jenisTestSvc.GetActive()
+	bbms, _ := h.bbmSvc.GetActive()
+
+	jenisTestJSON, _ := json.Marshal(jenisTests)
+	bbmJSON, _ := json.Marshal(bbms)
 
 	c.HTML(http.StatusOK, "transaction/penjualan/form.html", gin.H{
-		"User":          user,
-		"Favicon":       favicon,
-		"Title":         "Buat Penjualan BBM",
-		"ActiveMenu":    "trans_penjualan",
-		"IsEdit":        false,
-		"Shifts":        shifts,
-		"NozzleRows":    nozzleRowsJSON,
-		"DecimalPlaces": decimalPlaces,
-		"Penjualan":     nil,
+		"User":                 user,
+		"Favicon":              favicon,
+		"Title":                "Buat Penjualan BBM",
+		"ActiveMenu":           "trans_penjualan",
+		"IsEdit":               false,
+		"Shifts":               shifts,
+		"NozzleRows":           nozzleRowsJSON,
+		"DecimalPlaces":        decimalPlaces,
+		"Penjualan":            nil,
+		"JenisTestsJSON":       template.JS(jenisTestJSON),
+		"BBMsJSON":             template.JS(bbmJSON),
+		"PengeluaranTestsJSON": template.JS("[]"),
 	})
 }
 
@@ -280,18 +329,38 @@ func (h *PenjualanHandler) FormEdit(c *gin.Context) {
 	}
 
 	shifts, _ := h.shiftSvc.GetAll()
+	jenisTests, _ := h.jenisTestSvc.GetActive()
+	bbms, _ := h.bbmSvc.GetActive()
+
+	jenisTestJSON, _ := json.Marshal(jenisTests)
+	bbmJSON, _ := json.Marshal(bbms)
+	ptJSON, _ := json.Marshal(p.PengeluaranTests)
 
 	c.HTML(http.StatusOK, "transaction/penjualan/form.html", gin.H{
-		"User":          user,
-		"Favicon":       favicon,
-		"Title":         "Edit Penjualan BBM",
-		"ActiveMenu":    "trans_penjualan",
-		"IsEdit":        true,
-		"Shifts":        shifts,
-		"NozzleRows":    nozzleRowsJSON,
-		"DecimalPlaces": decimalPlaces,
-		"Penjualan":     p,
+		"User":                 user,
+		"Favicon":              favicon,
+		"Title":                "Edit Penjualan BBM",
+		"ActiveMenu":           "trans_penjualan",
+		"IsEdit":               true,
+		"Shifts":               shifts,
+		"NozzleRows":           nozzleRowsJSON,
+		"DecimalPlaces":        decimalPlaces,
+		"Penjualan":            p,
+		"JenisTestsJSON":       template.JS(jenisTestJSON),
+		"BBMsJSON":             template.JS(bbmJSON),
+		"PengeluaranTestsJSON": template.JS(ptJSON),
 	})
+}
+
+// LastTotalisator — JSON map nozzle_id → totalisator_akhir terakhir.
+// Digunakan oleh form create penjualan untuk auto-fill Totalisator Awal.
+func (h *PenjualanHandler) LastTotalisator(c *gin.Context) {
+	data, err := h.penjualanSvc.GetLastTotalisatorByNozzle()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, data)
 }
 
 // GetDetail — JSON detail satu penjualan.

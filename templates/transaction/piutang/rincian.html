@@ -1,0 +1,480 @@
+{{ define "transaction/piutang/rincian.html" }} {{ template "header.html" . }}
+
+<div x-data="piutangRincianApp()" class="space-y-5">
+  <div
+    class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
+  >
+    <div>
+      <h2 class="text-2xl font-bold text-slate-800">{{ .Title }}</h2>
+      <p class="text-slate-500 text-sm mt-1">
+        Daftar detail voucher dan kendaraan untuk setiap piutang B2B
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button
+        type="button"
+        @click="openFilterModal()"
+        class="inline-flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg shadow border border-gray-200 transition"
+      >
+        <i class="fas fa-filter"></i>
+        Filter
+        <span
+          x-show="hasActiveFilter()"
+          x-transition.opacity
+          class="ml-1 bg-blue-600 text-white text-xs font-bold px-1.5 py-0.5 rounded-full"
+          style="display: none"
+          >!</span
+        >
+      </button>
+
+      <a
+        href="/transaction/piutang"
+        class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-lg font-semibold shadow-sm border border-slate-200 transition-all flex items-center gap-2"
+      >
+        <svg
+          class="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M15 19l-7-7 7-7"
+          />
+        </svg>
+        Data Piutang
+      </a>
+    </div>
+  </div>
+
+  <div
+    class="glass-card bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"
+  >
+    <div
+      class="px-6 py-4 border-b border-slate-100 flex justify-between items-center"
+    >
+      <h3 class="font-semibold text-slate-700">Rincian Piutang</h3>
+    </div>
+    <div class="p-6">
+      <div class="overflow-x-auto">
+        <table
+          id="piutang-rincian-table"
+          class="w-full text-left border-collapse"
+          style="width: 100%"
+        >
+          <thead>
+            <tr class="bg-slate-50 border-b border-slate-200">
+              <th
+                class="p-3 font-semibold text-slate-600 text-sm border border-slate-200 w-10"
+              >
+                #
+              </th>
+              <th
+                class="p-3 font-semibold text-slate-600 text-sm border border-slate-200"
+              >
+                Tanggal
+              </th>
+              <th
+                class="p-3 font-semibold text-slate-600 text-sm border border-slate-200"
+              >
+                Pelanggan
+              </th>
+              <th
+                class="p-3 font-semibold text-slate-600 text-sm border border-slate-200"
+              >
+                No Voucher
+              </th>
+              <th
+                class="p-3 font-semibold text-slate-600 text-sm border border-slate-200"
+              >
+                No Pol
+              </th>
+              <th
+                class="p-3 font-semibold text-slate-600 text-sm border border-slate-200"
+              >
+                Driver
+              </th>
+              <th
+                class="p-3 font-semibold text-slate-600 text-sm border border-slate-200"
+              >
+                BBM
+              </th>
+              <th
+                class="p-3 font-semibold text-slate-600 text-sm border border-slate-200 text-right"
+              >
+                Qty
+              </th>
+              <th
+                class="p-3 font-semibold text-slate-600 text-sm border border-slate-200 text-right"
+              >
+                Harga/L
+              </th>
+              <th
+                class="p-3 font-semibold text-slate-600 text-sm border border-slate-200 text-right"
+              >
+                Total
+              </th>
+              <th
+                class="p-3 font-semibold text-slate-600 text-sm border border-slate-200 text-center"
+              >
+                Status
+              </th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div
+    x-show="showFilter"
+    x-transition.opacity
+    class="fixed inset-0 z-50"
+    style="display: none"
+  >
+    <div class="absolute inset-0 bg-black/40" @click="closeFilterModal()"></div>
+    <div
+      class="relative z-10 flex items-start justify-center min-h-screen pt-24 px-4"
+    >
+      <div
+        class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden"
+      >
+        <div class="flex items-center justify-between px-6 py-4 border-b">
+          <h3 class="font-semibold text-gray-800">
+            <i class="fas fa-filter mr-2 text-blue-500"></i>Filter Rincian
+            Piutang
+          </h3>
+          <button
+            @click="closeFilterModal()"
+            class="text-gray-400 hover:text-gray-600 text-xl"
+          >
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="p-6 space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1"
+              >Partner</label
+            >
+            <select id="f-partner-id" class="w-full">
+              <option value="">-- Semua Partner --</option>
+              {{ range .Partners }}
+              <option value="{{ .ID }}">{{ .Name }}</option>
+              {{ end }}
+            </select>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1"
+                >Waktu Mulai</label
+              >
+              <input
+                id="f-waktu-mulai"
+                type="date"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1"
+                >Waktu Akhir</label
+              >
+              <input
+                id="f-waktu-akhir"
+                type="date"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1"
+              >Status</label
+            >
+            <select
+              id="f-status-pembayaran"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+            >
+              <option value="">-- Semua Status --</option>
+              <option value="paid">Lunas</option>
+              <option value="unpaid">Belum Lunas</option>
+            </select>
+          </div>
+        </div>
+        <div
+          class="flex items-center justify-end gap-3 px-6 py-4 border-t bg-gray-50"
+        >
+          <button
+            type="button"
+            @click="resetFilter()"
+            class="px-4 py-2 text-sm text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+          >
+            Reset
+          </button>
+          <button
+            type="button"
+            @click="applyFilter()"
+            class="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+            :class="{ 'btn-loading': filterLoading }"
+          >
+            <span x-show="!filterLoading">Terapkan</span>
+            <span x-show="filterLoading" style="display: none"
+              ><i class="fas fa-spinner fa-spin mr-1"></i>Mencari...</span
+            >
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<link rel="stylesheet" href="/static/vendor/jquery.dataTables.min.css" />
+<link
+  rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css"
+/>
+<link
+  rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+/>
+<script src="/static/vendor/jquery-3.7.1.min.js"></script>
+<script src="/static/vendor/jquery.dataTables.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
+
+<style>
+  .dataTables_wrapper .dataTables_length select,
+  .dataTables_wrapper .dataTables_filter input {
+    border: 1px solid #cbd5e1;
+    border-radius: 0.5rem;
+    padding: 0.25rem 0.5rem;
+    outline: none;
+    font-size: 0.875rem;
+  }
+  .dataTables_wrapper .dataTables_info {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    padding-top: 0.75rem;
+  }
+  .dataTables_wrapper .dataTables_paginate .paginate_button.current,
+  .dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
+    background: #005596 !important;
+    color: white !important;
+    border: none;
+    border-radius: 0.5rem;
+  }
+  .dataTables_wrapper .dataTables_paginate .paginate_button {
+    border-radius: 0.5rem;
+    border: none !important;
+  }
+  .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+    background: #f1f5f9 !important;
+    color: #1e293b !important;
+    border: none !important;
+  }
+  #piutang-rincian-table tbody td {
+    border-right: 1px solid #f1f5f9;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  #piutang-rincian-table tbody tr:hover {
+    background-color: rgba(248, 250, 252, 0.8);
+  }
+  .select2-container .select2-selection--single {
+    height: 38px !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 0.5rem !important;
+    padding-top: 4px;
+  }
+  .select2-container--default
+    .select2-selection--single
+    .select2-selection__arrow {
+    height: 36px !important;
+  }
+  .btn-loading {
+    position: relative;
+    pointer-events: none;
+    opacity: 0.8;
+  }
+</style>
+
+<script>
+  document.addEventListener("alpine:init", function () {
+    Alpine.data("piutangRincianApp", function () {
+      return {
+        dt: null,
+        showFilter: false,
+        filterLoading: false,
+        filter: {
+          partner_id: "",
+          waktu_mulai: "",
+          waktu_akhir: "",
+          status_pembayaran: "",
+        },
+
+        init: function () {
+          window._piutangRincianApp = this;
+          this.initDataTable();
+
+          this.$nextTick(function () {
+            $("#f-partner-id").select2({
+              placeholder: "-- Semua Partner --",
+              allowClear: true,
+              width: "100%",
+              dropdownParent: $("#f-partner-id").closest(".bg-white"),
+            });
+          });
+        },
+
+        initDataTable: function () {
+          var self = this;
+          this.dt = $("#piutang-rincian-table").DataTable({
+            processing: true,
+            serverSide: true,
+            ajax: {
+              url: "/transaction/piutang/rincian/datatable",
+              type: "POST",
+              data: function (d) {
+                d.filter_partner_id = self.filter.partner_id || "";
+                d.filter_waktu_mulai = self.filter.waktu_mulai || "";
+                d.filter_waktu_akhir = self.filter.waktu_akhir || "";
+                d.filter_status_pembayaran =
+                  self.filter.status_pembayaran || "";
+                return d;
+              },
+            },
+            columns: [
+              {
+                data: null,
+                orderable: false,
+                searchable: false,
+                render: function (_, __, ___, meta) {
+                  return meta.row + meta.settings._iDisplayStart + 1;
+                },
+              },
+              { data: "tgl" },
+              { data: "partner_name" },
+              { data: "no_voucher", defaultContent: "-" },
+              { data: "no_pol", defaultContent: "-" },
+              { data: "driver_name", defaultContent: "-" },
+              { data: "bbm_name" },
+              {
+                data: "qty_liter",
+                className: "text-right",
+                render: function (v) {
+                  return formatIDR(v) + " L";
+                },
+              },
+              {
+                data: "harga_bbm",
+                className: "text-right",
+                render: function (v) {
+                  return "Rp " + formatIDR(v);
+                },
+              },
+              {
+                data: "total_line",
+                className: "text-right",
+                render: function (v) {
+                  return (
+                    '<span class="font-semibold text-[#005596]">Rp ' +
+                    formatIDR(v) +
+                    "</span>"
+                  );
+                },
+              },
+              {
+                data: "status",
+                className: "text-center",
+                render: function (v) {
+                  return v === "paid"
+                    ? '<span class="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">Lunas</span>'
+                    : '<span class="px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Belum Lunas</span>';
+                },
+              },
+            ],
+            order: [[1, "desc"]],
+            language: {
+              processing: "Memuat data...",
+              emptyTable: "Tidak ada rincian piutang",
+              lengthMenu: "Tampilkan _MENU_ data",
+              info: "Menampilkan _START_ - _END_ dari _TOTAL_ data",
+              infoEmpty: "Tidak ada data",
+              search: "Cari:",
+              paginate: {
+                first: "&laquo;",
+                last: "&raquo;",
+                next: "&rsaquo;",
+                previous: "&lsaquo;",
+              },
+            },
+            dom: '<"flex flex-col md:flex-row justify-between items-center gap-3 mb-4"lf>rt<"flex flex-col md:flex-row justify-between items-center gap-3 mt-4"ip>',
+            pageLength: 25,
+          });
+        },
+
+        openFilterModal: function () {
+          this.showFilter = true;
+          this.$nextTick(
+            function () {
+              $("#f-partner-id")
+                .val(this.filter.partner_id || "")
+                .trigger("change");
+              document.getElementById("f-waktu-mulai").value =
+                this.filter.waktu_mulai || "";
+              document.getElementById("f-waktu-akhir").value =
+                this.filter.waktu_akhir || "";
+              document.getElementById("f-status-pembayaran").value =
+                this.filter.status_pembayaran || "";
+            }.bind(this),
+          );
+        },
+
+        closeFilterModal: function () {
+          this.showFilter = false;
+        },
+
+        applyFilter: function () {
+          this.filterLoading = true;
+          this.filter = {
+            partner_id: $("#f-partner-id").val() || "",
+            waktu_mulai: document.getElementById("f-waktu-mulai").value || "",
+            waktu_akhir: document.getElementById("f-waktu-akhir").value || "",
+            status_pembayaran:
+              document.getElementById("f-status-pembayaran").value || "",
+          };
+          this.closeFilterModal();
+          this.dt.ajax.reload(function () {
+            window._piutangRincianApp.filterLoading = false;
+          }, false);
+        },
+
+        resetFilter: function () {
+          this.filter = {
+            partner_id: "",
+            waktu_mulai: "",
+            waktu_akhir: "",
+            status_pembayaran: "",
+          };
+          $("#f-partner-id").val("").trigger("change");
+          document.getElementById("f-waktu-mulai").value = "";
+          document.getElementById("f-waktu-akhir").value = "";
+          document.getElementById("f-status-pembayaran").value = "";
+          this.closeFilterModal();
+          this.dt.ajax.reload(null, false);
+        },
+
+        hasActiveFilter: function () {
+          return !!(
+            this.filter.partner_id ||
+            this.filter.waktu_mulai ||
+            this.filter.waktu_akhir ||
+            this.filter.status_pembayaran
+          );
+        },
+      };
+    });
+  });
+</script>
+
+{{ template "footer.html" . }} {{ end }}

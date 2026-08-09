@@ -35,6 +35,8 @@ type PiutangService interface {
 	SummaryByMonth(month string) (repository.PiutangSummary, error)
 	GroupedRekapByMonth(month string) ([]repository.PiutangGroupedDate, repository.PiutangGroupedGrandTotal, error)
 	Create(p *entity.TrxPiutang, createdBy *uint) error
+	AddDetail(piutangID uint64, detail *entity.TrxPiutangDetail, updatedBy *uint) error
+	UpdateDetail(piutangID uint64, detailID uint64, detail *entity.TrxPiutangDetail, updatedBy *uint) error
 	Delete(id uint64) error
 	Lunas(id uint64, updatedBy *uint) error
 }
@@ -127,6 +129,25 @@ func (s *piutangService) Create(p *entity.TrxPiutang, createdBy *uint) error {
 		return fmt.Errorf("piutang tersimpan, namun jurnal gagal: %w", err)
 	}
 
+	return nil
+}
+
+func (s *piutangService) AddDetail(piutangID uint64, detail *entity.TrxPiutangDetail, updatedBy *uint) error {
+	detail.UpdatedBy = updatedBy
+	detail.CreatedBy = updatedBy
+	detail.TotalLine = detail.HargaBBM * detail.QtyLiter
+	if err := s.repo.AddDetail(piutangID, detail); err != nil {
+		return fmt.Errorf("gagal menambah detail piutang: %w", err)
+	}
+	return nil
+}
+
+func (s *piutangService) UpdateDetail(piutangID uint64, detailID uint64, detail *entity.TrxPiutangDetail, updatedBy *uint) error {
+	detail.UpdatedBy = updatedBy
+	detail.TotalLine = detail.HargaBBM * detail.QtyLiter
+	if err := s.repo.UpdateDetail(piutangID, detailID, detail); err != nil {
+		return fmt.Errorf("gagal memperbarui detail piutang: %w", err)
+	}
 	return nil
 }
 

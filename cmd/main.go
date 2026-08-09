@@ -403,12 +403,14 @@ func main() {
 
 	// Create shifts table (master shift kerja)
 	database.DB.Exec(`CREATE TABLE IF NOT EXISTS shifts (
-		id         SERIAL PRIMARY KEY,
-		shift_name VARCHAR(100) NOT NULL,
-		shift_time VARCHAR(50),
-		created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+		id           SERIAL PRIMARY KEY,
+		shift_name   VARCHAR(100) NOT NULL,
+		shift_time   VARCHAR(50),
+		is_cross_day BOOLEAN DEFAULT FALSE,
+		created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 	)`)
+	database.DB.Exec(`ALTER TABLE shifts ADD COLUMN IF NOT EXISTS is_cross_day BOOLEAN DEFAULT FALSE`)
 
 	// Create trx_kedatangan_bbm table
 	database.DB.Exec(`CREATE TABLE IF NOT EXISTS trx_kedatangan_bbm (
@@ -506,23 +508,68 @@ func main() {
 
 	log.Println("Manual migration completed")
 
-	// Create trx_penyusutan table (penyusutan/susut BBM harian)
+	// Create trx_penyusutan table (snapshot penyusutan berbasis laporan penjualan)
 	database.DB.Exec(`CREATE TABLE IF NOT EXISTS trx_penyusutan (
-		id_penyusutan   BIGSERIAL       PRIMARY KEY,
-		no_penyusutan   VARCHAR(25)     NOT NULL,
-		tgl_penyusutan  DATE            NOT NULL,
-		shift_id        INT             NOT NULL REFERENCES shifts(id) ON DELETE RESTRICT,
-		bbm_id          INT             NOT NULL REFERENCES bbm(id) ON DELETE RESTRICT,
-		jml_liter       BIGINT          NOT NULL DEFAULT 0,
-		harga_dasar     BIGINT          NOT NULL DEFAULT 0,
-		nilai_rupiah    BIGINT          NOT NULL DEFAULT 0,
-		keterangan      TEXT,
-		created         TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		created_by      INT             NULL REFERENCES users(id) ON DELETE SET NULL,
-		updated         TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		updated_by      INT             NULL REFERENCES users(id) ON DELETE SET NULL,
-		CONSTRAINT uni_trx_penyusutan_no_penyusutan UNIQUE (no_penyusutan)
+		id_penyusutan    BIGSERIAL       PRIMARY KEY,
+		penjualan_id     BIGINT          NOT NULL REFERENCES trx_penjualan(id_penjualan) ON DELETE CASCADE,
+		no_form          VARCHAR(50)     NOT NULL,
+		shift_id         INT             NOT NULL REFERENCES shifts(id) ON DELETE RESTRICT,
+		waktu            TIMESTAMP       NOT NULL,
+		bbm_id           INT             NOT NULL REFERENCES bbm(id) ON DELETE RESTRICT,
+		first_stock      NUMERIC(20,2)   NOT NULL DEFAULT 0,
+		endstock_actual  NUMERIC(20,2)   NOT NULL DEFAULT 0,
+		endstock_booked  NUMERIC(20,2)   NOT NULL DEFAULT 0,
+		created          TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		created_by       INT             NULL REFERENCES users(id) ON DELETE SET NULL,
+		updated          TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_by       INT             NULL REFERENCES users(id) ON DELETE SET NULL,
+		CONSTRAINT uni_trx_penyusutan_penjualan_bbm UNIQUE (penjualan_id, bbm_id)
 	)`)
+
+	// Backward-compatible migration from old penyusutan schema
+	database.DB.Exec(`ALTER TABLE trx_penyusutan ADD COLUMN IF NOT EXISTS penjualan_id BIGINT NULL`)
+	database.DB.Exec(`ALTER TABLE trx_penyusutan ADD COLUMN IF NOT EXISTS no_form VARCHAR(50) DEFAULT ''`)
+	database.DB.Exec(`ALTER TABLE trx_penyusutan ADD COLUMN IF NOT EXISTS waktu TIMESTAMP NULL`)
+	database.DB.Exec(`ALTER TABLE trx_penyusutan ADD COLUMN IF NOT EXISTS first_stock NUMERIC(20,2) NOT NULL DEFAULT 0`)
+	database.DB.Exec(`ALTER TABLE trx_penyusutan ADD COLUMN IF NOT EXISTS endstock_actual NUMERIC(20,2) NOT NULL DEFAULT 0`)
+	database.DB.Exec(`ALTER TABLE trx_penyusutan ADD COLUMN IF NOT EXISTS endstock_booked NUMERIC(20,2) NOT NULL DEFAULT 0`)
+	database.DB.Exec(`DO $$ BEGIN
+		IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='trx_penyusutan' AND column_name='tgl_penyusutan') THEN
+			EXECUTE 'UPDATE trx_penyusutan SET waktu = COALESCE(waktu, tgl_penyusutan::timestamp)';
+		END IF;
+	END $$`)
+	database.DB.Exec(`DO $$ BEGIN
+		IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='trx_penyusutan' AND column_name='no_penyusutan') THEN
+			EXECUTE 'UPDATE trx_penyusutan SET no_form = COALESCE(NULLIF(no_form, ''''), no_penyusutan)';
+		END IF;
+	END $$`)
+	database.DB.Exec(`DO $$ BEGIN
+		IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='trx_penyusutan' AND column_name='nilai_rupiah') THEN
+			UPDATE trx_penyusutan
+			SET endstock_booked = COALESCE(endstock_booked, 0),
+				endstock_actual = COALESCE(endstock_actual, 0),
+				first_stock = COALESCE(first_stock, 0);
+		END IF;
+	END $$`)
+	database.DB.Exec(`DO $$ BEGIN
+		IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname='uni_trx_penyusutan_no_penyusutan') THEN
+			ALTER TABLE trx_penyusutan DROP CONSTRAINT uni_trx_penyusutan_no_penyusutan;
+		END IF;
+	END $$`)
+	database.DB.Exec(`DO $$ BEGIN
+		IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='uni_trx_penyusutan_penjualan_bbm')
+		   AND NOT EXISTS (SELECT 1 FROM pg_class WHERE relname='uni_trx_penyusutan_penjualan_bbm') THEN
+			ALTER TABLE trx_penyusutan ADD CONSTRAINT uni_trx_penyusutan_penjualan_bbm UNIQUE (penjualan_id, bbm_id);
+		END IF;
+	END $$`)
+	database.DB.Exec(`DO $$ BEGIN
+		IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints tc
+			WHERE tc.table_name='trx_penyusutan' AND tc.constraint_type='FOREIGN KEY' AND tc.constraint_name='fk_trx_penyusutan_penjualan') THEN
+			ALTER TABLE trx_penyusutan
+			ADD CONSTRAINT fk_trx_penyusutan_penjualan
+			FOREIGN KEY (penjualan_id) REFERENCES trx_penjualan(id_penjualan) ON DELETE CASCADE;
+		END IF;
+	END $$`)
 
 	// Create jenis_test table (master data jenis pengujian/kalibrasi BBM)
 	database.DB.Exec(`CREATE TABLE IF NOT EXISTS jenis_test (
@@ -547,15 +594,7 @@ func main() {
 		updated_at      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
 	)`)
 
-	// Rename old penyusutan unique constraint to GORM-expected name (handles existing DBs)
-	database.DB.Exec(`DO $$ BEGIN
-		IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uni_trx_penyusutan_no_penyusutan')
-		   AND NOT EXISTS (SELECT 1 FROM pg_class WHERE relname = 'uni_trx_penyusutan_no_penyusutan') THEN
-			IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uni_trx_penyusutan_no') THEN
-				ALTER TABLE trx_penyusutan RENAME CONSTRAINT uni_trx_penyusutan_no TO uni_trx_penyusutan_no_penyusutan;
-			END IF;
-		END IF;
-	END $$`)
+	// NOTE: legacy rows from old schema may not have penjualan_id; keep migration tolerant.
 
 	// Auto Migrate (enabled for easier setup)
 	if err := database.DB.AutoMigrate(
@@ -645,6 +684,22 @@ func main() {
 	kedatanganService := service.NewKedatanganBBMService(kedatanganRepo)
 	jenisTestRepo := repository.NewJenisTestRepository(database.DB)
 	jenisTestService := service.NewJenisTestService(jenisTestRepo)
+	penyusutanRepo := repository.NewPenyusutanRepository(database.DB)
+	penyusutanService := service.NewPenyusutanService(penyusutanRepo)
+
+	// Recalculate all penyusutan records on startup to apply new logic to existing data
+	log.Println("Recalculating all penyusutan records to align with shift logic...")
+	var penjualanList []entity.TrxPenjualan
+	if err := database.DB.Preload("Details").Order("waktu_mulai ASC").Find(&penjualanList).Error; err == nil {
+		for _, p := range penjualanList {
+			if err := penyusutanRepo.UpsertFromPenjualan(&p, nil); err != nil {
+				log.Printf("Failed to recalculate penyusutan for penjualan %s: %v", p.NoPenjualan, err)
+			}
+		}
+		log.Println("Recalculation of penyusutan completed successfully!")
+	} else {
+		log.Printf("Failed to query penjualan for recalculation: %v", err)
+	}
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(authService)
@@ -667,8 +722,9 @@ func main() {
 	kedatanganBBMHandler := handler.NewKedatanganBBMHandler(kedatanganService, shiftService)
 	penjualanRepo := repository.NewPenjualanRepository(database.DB)
 	penjualanService := service.NewPenjualanService(penjualanRepo, accountingService)
-	penjualanHandler := handler.NewPenjualanHandler(penjualanService, tiangService, shiftService, settingService, jenisTestService, bbmService)
+	penjualanHandler := handler.NewPenjualanHandler(penjualanService, penyusutanService, tiangService, shiftService, settingService, jenisTestService, bbmService)
 	jenisTestHandler := handler.NewJenisTestHandler(jenisTestService)
+	penyusutanHandler := handler.NewPenyusutanHandler(penyusutanService)
 	piutangRepo := repository.NewPiutangRepository(database.DB)
 	piutangService := service.NewPiutangService(piutangRepo, accountingService)
 	piutangHandler := handler.NewPiutangHandler(piutangService, partnerService, penjualanService, bbmService)
@@ -893,6 +949,8 @@ func main() {
 			transaction.GET("/penjualan/:id/detail", penjualanHandler.GetDetail)
 			transaction.POST("/penjualan/:id", penjualanHandler.Update)
 			transaction.POST("/penjualan/:id/delete", penjualanHandler.Delete)
+			transaction.GET("/penyusutan", penyusutanHandler.Index)
+			transaction.POST("/penyusutan/:id/actual", penyusutanHandler.UpdateEndstockActual)
 
 			// Piutang B2B — tagihan penjualan kredit ke partner
 			transaction.GET("/piutang", piutangHandler.Index)
@@ -905,6 +963,8 @@ func main() {
 			transaction.POST("/piutang/rincian/datatable", piutangHandler.DatatableRincian)
 			transaction.POST("/piutang/rekap/datatable", piutangHandler.DatatableRekap)
 			transaction.GET("/piutang/:id/detail", piutangHandler.GetDetail)
+			transaction.POST("/piutang/:id/detail", piutangHandler.AddDetail)
+			transaction.POST("/piutang/:id/detail/:detail_id", piutangHandler.UpdateDetail)
 			transaction.POST("/piutang", piutangHandler.Create)
 			transaction.POST("/piutang/:id/lunas", piutangHandler.Lunas)
 			transaction.POST("/piutang/:id/delete", piutangHandler.Delete)

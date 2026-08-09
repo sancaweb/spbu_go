@@ -26,6 +26,8 @@ type PiutangRepository interface {
 	GroupedRekapByMonth(month string) ([]PiutangGroupedDate, PiutangGroupedGrandTotal, error)
 	Create(p *entity.TrxPiutang) error
 	Update(p *entity.TrxPiutang) error
+	AddDetail(piutangID uint64, detail *entity.TrxPiutangDetail) error
+	UpdateDetail(piutangID uint64, detailID uint64, detail *entity.TrxPiutangDetail) error
 	MarkPaid(id uint64, updatedBy *uint) error
 	Delete(id uint64) error
 }
@@ -465,7 +467,7 @@ func (r *piutangRepository) GroupedRekapByMonth(month string) ([]PiutangGroupedD
 		FROM trx_piutang pt
 		JOIN partners pa ON pa.id = pt.pelanggan_id
 		WHERE TO_CHAR(pt.created, 'YYYY-MM') = ?
-		ORDER BY DATE(pt.created) ASC, pt.id_piutang ASC
+		ORDER BY DATE(pt.created) DESC, pt.id_piutang ASC
 	`, month).Scan(&rows).Error
 	if err != nil {
 		return nil, PiutangGroupedGrandTotal{}, err
@@ -512,6 +514,59 @@ func (r *piutangRepository) Create(p *entity.TrxPiutang) error {
 
 func (r *piutangRepository) Update(p *entity.TrxPiutang) error {
 	return r.db.Omit("Partner", "Penjualan", "Creator", "Updater").Save(p).Error
+}
+
+func (r *piutangRepository) AddDetail(piutangID uint64, detail *entity.TrxPiutangDetail) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var header entity.TrxPiutang
+		if err := tx.Select("id_piutang", "penjualan_id").Where("id_piutang = ?", piutangID).First(&header).Error; err != nil {
+			return err
+		}
+
+		detail.PiutangID = piutangID
+		if detail.PenjualanID == 0 {
+			detail.PenjualanID = header.PenjualanID
+		}
+		detail.TotalLine = detail.HargaBBM * detail.QtyLiter
+
+		return tx.Omit("Piutang", "Penjualan", "BBM", "Creator", "Updater").Create(detail).Error
+	})
+}
+
+func (r *piutangRepository) UpdateDetail(piutangID uint64, detailID uint64, detail *entity.TrxPiutangDetail) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var header entity.TrxPiutang
+		if err := tx.Select("id_piutang", "penjualan_id").Where("id_piutang = ?", piutangID).First(&header).Error; err != nil {
+			return err
+		}
+
+		var existing entity.TrxPiutangDetail
+		if err := tx.Where("id_piutang_detail = ? AND piutang_id = ?", detailID, piutangID).First(&existing).Error; err != nil {
+			return err
+		}
+
+		penjualanID := detail.PenjualanID
+		if penjualanID == 0 {
+			penjualanID = header.PenjualanID
+		}
+
+		updates := map[string]interface{}{
+			"penjualan_id": penjualanID,
+			"no_voucher":   detail.NoVoucher,
+			"no_pol":       detail.NoPol,
+			"driver_name":  detail.DriverName,
+			"bbm_id":       detail.BBMID,
+			"harga_bbm":    detail.HargaBBM,
+			"margin":       detail.Margin,
+			"qty_liter":    detail.QtyLiter,
+			"total_line":   detail.HargaBBM * detail.QtyLiter,
+			"updated_by":   detail.UpdatedBy,
+		}
+
+		return tx.Model(&entity.TrxPiutangDetail{}).
+			Where("id_piutang_detail = ? AND piutang_id = ?", detailID, piutangID).
+			Updates(updates).Error
+	})
 }
 
 func (r *piutangRepository) MarkPaid(id uint64, updatedBy *uint) error {

@@ -200,6 +200,17 @@ type createPiutangDetailInput struct {
 	QtyLiter    int64  `json:"qty_liter"`
 }
 
+type upsertPiutangDetailInput struct {
+	PenjualanID uint64 `json:"penjualan_id"`
+	NoVoucher   string `json:"no_voucher"`
+	NoPol       string `json:"no_pol"`
+	DriverName  string `json:"driver_name"`
+	BBMID       uint   `json:"bbm_id" binding:"required"`
+	HargaBBM    int64  `json:"harga_bbm" binding:"required"`
+	Margin      int64  `json:"margin"`
+	QtyLiter    int64  `json:"qty_liter" binding:"required"`
+}
+
 type createPiutangInput struct {
 	PenjualanID  uint64                     `json:"penjualan_id" binding:"required"`
 	PelangganID  uint                       `json:"pelanggan_id"`
@@ -261,6 +272,95 @@ func (h *PiutangHandler) Create(c *gin.Context) {
 		"message": "Piutang berhasil disimpan",
 		"data":    gin.H{"id_piutang": piutang.IDPiutang},
 	})
+}
+
+func (h *PiutangHandler) AddDetail(c *gin.Context) {
+	piutangID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "ID piutang tidak valid"})
+		return
+	}
+
+	var input upsertPiutangDetailInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": err.Error()})
+		return
+	}
+	if input.QtyLiter <= 0 || input.HargaBBM <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Qty liter dan harga BBM harus lebih dari 0"})
+		return
+	}
+
+	userRaw, _ := c.Get("user")
+	var updatedBy *uint
+	if u, ok := userRaw.(*entity.User); ok {
+		updatedBy = &u.ID
+	}
+
+	detail := &entity.TrxPiutangDetail{
+		PenjualanID: input.PenjualanID,
+		NoVoucher:   strings.TrimSpace(input.NoVoucher),
+		NoPol:       strings.TrimSpace(input.NoPol),
+		DriverName:  strings.TrimSpace(input.DriverName),
+		BBMID:       input.BBMID,
+		HargaBBM:    input.HargaBBM,
+		Margin:      input.Margin,
+		QtyLiter:    input.QtyLiter,
+	}
+
+	if err := h.svc.AddDetail(piutangID, detail, updatedBy); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Detail piutang berhasil ditambahkan"})
+}
+
+func (h *PiutangHandler) UpdateDetail(c *gin.Context) {
+	piutangID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "ID piutang tidak valid"})
+		return
+	}
+	detailID, err := strconv.ParseUint(c.Param("detail_id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "ID detail tidak valid"})
+		return
+	}
+
+	var input upsertPiutangDetailInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": err.Error()})
+		return
+	}
+	if input.QtyLiter <= 0 || input.HargaBBM <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": "Qty liter dan harga BBM harus lebih dari 0"})
+		return
+	}
+
+	userRaw, _ := c.Get("user")
+	var updatedBy *uint
+	if u, ok := userRaw.(*entity.User); ok {
+		updatedBy = &u.ID
+	}
+
+	detail := &entity.TrxPiutangDetail{
+		PenjualanID: input.PenjualanID,
+		NoVoucher:   strings.TrimSpace(input.NoVoucher),
+		NoPol:       strings.TrimSpace(input.NoPol),
+		DriverName:  strings.TrimSpace(input.DriverName),
+		BBMID:       input.BBMID,
+		HargaBBM:    input.HargaBBM,
+		Margin:      input.Margin,
+		QtyLiter:    input.QtyLiter,
+	}
+
+	if err := h.svc.UpdateDetail(piutangID, detailID, detail, updatedBy); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "success", "message": "Detail piutang berhasil diperbarui"})
 }
 
 // ─── Lunas — tandai piutang sebagai lunas ─────────────────────────────────────

@@ -38,6 +38,8 @@ func (h *ShiftHandler) Index(c *gin.Context) {
 func (h *ShiftHandler) Create(c *gin.Context) {
 	shiftName := strings.TrimSpace(c.PostForm("shift_name"))
 	shiftTime := strings.TrimSpace(c.PostForm("shift_time"))
+	isCrossDayStr := strings.TrimSpace(c.PostForm("is_cross_day"))
+	isCrossDay := isCrossDayStr == "true" || isCrossDayStr == "1" || isCrossDayStr == "on"
 
 	if shiftName == "" {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"status": false, "message": "Nama Shift wajib diisi"})
@@ -45,8 +47,9 @@ func (h *ShiftHandler) Create(c *gin.Context) {
 	}
 
 	shift := entity.Shift{
-		ShiftName: shiftName,
-		ShiftTime: shiftTime,
+		ShiftName:  shiftName,
+		ShiftTime:  shiftTime,
+		IsCrossDay: isCrossDay,
 	}
 
 	if err := h.shiftService.Create(&shift); err != nil {
@@ -73,6 +76,8 @@ func (h *ShiftHandler) Update(c *gin.Context) {
 
 	shiftName := strings.TrimSpace(c.PostForm("shift_name"))
 	shiftTime := strings.TrimSpace(c.PostForm("shift_time"))
+	isCrossDayStr := strings.TrimSpace(c.PostForm("is_cross_day"))
+	isCrossDay := isCrossDayStr == "true" || isCrossDayStr == "1" || isCrossDayStr == "on"
 
 	if shiftName == "" {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"status": false, "message": "Nama Shift wajib diisi"})
@@ -81,6 +86,7 @@ func (h *ShiftHandler) Update(c *gin.Context) {
 
 	shift.ShiftName = shiftName
 	shift.ShiftTime = shiftTime
+	shift.IsCrossDay = isCrossDay
 
 	if err := h.shiftService.Update(&shift); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"status": false, "message": "Gagal mengupdate shift"})

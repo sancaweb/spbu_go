@@ -65,11 +65,43 @@
     <h2 class="font-semibold text-gray-700 mb-4 flex items-center gap-2">
       <i class="fas fa-info-circle text-blue-500"></i> Informasi Shift
     </h2>
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      <!-- Waktu Mulai -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- 1. Tanggal (manual dipilih) -->
       <div>
         <label class="block text-sm font-medium text-gray-600 mb-1">
-          Waktu Mulai <span class="text-red-500">*</span>
+          Tanggal <span class="text-red-500">*</span>
+        </label>
+        <input
+          type="date"
+          x-model="form.tanggal"
+          @change="onTanggalOrShiftChange()"
+          class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 text-gray-800 bg-white"
+        />
+      </div>
+
+      <!-- 2. Shift (dropdown shift dari database) -->
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">
+          Shift <span class="text-red-500">*</span>
+        </label>
+        <select
+          x-model.number="form.shift_id"
+          @change="onTanggalOrShiftChange()"
+          class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 text-gray-800 bg-white"
+        >
+          <option value="">-- Pilih Shift --</option>
+          {{ range .Shifts }}
+          <option value="{{ .ID }}">
+            {{ .ShiftName }}{{ if .ShiftTime }} ({{ .ShiftTime }}){{ end }}
+          </option>
+          {{ end }}
+        </select>
+      </div>
+
+      <!-- 3. Waktu Awal (terisi otomatis saat shift/tanggal dipilih) -->
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">
+          Waktu Awal <span class="text-red-500">*</span>
         </label>
         <div class="relative">
           <!-- Display: formatted Indonesian date -->
@@ -79,14 +111,13 @@
           >
             <i class="fas fa-calendar-alt mr-1 text-gray-400"></i>
             <span
-              x-text="form.waktu_mulai ? formatWaktuID(form.waktu_mulai) : 'Pilih tanggal &amp; waktu'"
+              x-text="form.waktu_mulai ? formatWaktuID(form.waktu_mulai) : 'Terisi otomatis saat shift dipilih'"
             ></span>
           </div>
-          <!-- Hidden datetime-local; z-index:2 ensures clicks reach it through overlay -->
+          <!-- Hidden datetime-local -->
           <input
             type="datetime-local"
             x-model="form.waktu_mulai"
-            @change="onWaktuMulaiChange()"
             style="z-index: 2"
             class="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
             {{
@@ -100,7 +131,7 @@
         </div>
       </div>
 
-      <!-- Waktu Akhir -->
+      <!-- 4. Waktu Akhir (terisi otomatis saat shift/tanggal dipilih) -->
       <div>
         <label class="block text-sm font-medium text-gray-600 mb-1">
           Waktu Akhir <span class="text-red-500">*</span>
@@ -113,15 +144,14 @@
           >
             <i class="fas fa-calendar-alt mr-1 text-gray-400"></i>
             <span
-              x-text="form.waktu_akhir ? formatWaktuID(form.waktu_akhir) : 'Pilih tanggal &amp; waktu'"
+              x-text="form.waktu_akhir ? formatWaktuID(form.waktu_akhir) : 'Terisi otomatis saat shift dipilih'"
             ></span>
           </div>
-          <!-- Hidden datetime-local; :min enforces cannot pick before waktu_mulai -->
+          <!-- Hidden datetime-local -->
           <input
             type="datetime-local"
             x-model="form.waktu_akhir"
             :min="form.waktu_mulai"
-            @change="autoDetectShift()"
             style="z-index: 2"
             class="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
             {{
@@ -133,31 +163,6 @@
             }}
           />
         </div>
-      </div>
-
-      <!-- Shift (auto-detect) -->
-      <div>
-        <label class="block text-sm font-medium text-gray-600 mb-1">
-          Shift <span class="text-red-500">*</span>
-          <span
-            x-show="shiftDetected"
-            class="ml-1 text-xs text-green-600 font-normal"
-            ><i class="fas fa-magic"></i> terdeteksi otomatis</span
-          >
-        </label>
-        <select
-          x-model.number="form.shift_id"
-          @change="shiftDetected = false"
-          class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-          :class="shiftDetected ? 'border-green-300 bg-green-50' : ''"
-        >
-          <option value="">-- Pilih Shift --</option>
-          {{ range .Shifts }}
-          <option value="{{ .ID }}">
-            {{ .ShiftName }}{{ if .ShiftTime }} ({{ .ShiftTime }}){{ end }}
-          </option>
-          {{ end }}
-        </select>
       </div>
     </div>
   </div>
@@ -609,6 +614,7 @@
           _jenisTestData: _jenisTestData,
           _bbmData: _bbmData,
           form: {
+            tanggal: "",
             shift_id: _shiftID || "",
             waktu_mulai: "",
             waktu_akhir: "",
@@ -665,13 +671,26 @@
             });
             self.calcSelisih();
 
-            // 5) Sync datetime values for edit mode
+            // 5) Sync datetime values and tanggal for edit mode or create mode
             if (_isEdit) {
               var allDT = document.querySelectorAll(
                 'input[type="datetime-local"]',
               );
-              if (allDT[0]) self.form.waktu_mulai = allDT[0].value;
-              if (allDT[1]) self.form.waktu_akhir = allDT[1].value;
+              if (allDT[0] && allDT[0].value) self.form.waktu_mulai = allDT[0].value;
+              if (allDT[1] && allDT[1].value) self.form.waktu_akhir = allDT[1].value;
+              if (self.form.waktu_mulai) {
+                self.form.tanggal = self.form.waktu_mulai.split("T")[0];
+              }
+            } else {
+              var today = new Date();
+              var yyyy = today.getFullYear();
+              var mm = String(today.getMonth() + 1).padStart(2, "0");
+              var dd = String(today.getDate()).padStart(2, "0");
+              self.form.tanggal = yyyy + "-" + mm + "-" + dd;
+            }
+
+            if (self.form.tanggal && self.form.shift_id && !self.form.waktu_mulai) {
+              self.onTanggalOrShiftChange();
             }
 
             // 6) Auto-fill Totalisator Awal from last saved values (create mode only)
@@ -760,44 +779,50 @@
             );
           },
 
-          onWaktuMulaiChange: function () {
-            if (
-              this.form.waktu_akhir &&
-              this.form.waktu_akhir < this.form.waktu_mulai
-            ) {
-              this.form.waktu_akhir = "";
-            }
-            this.autoDetectShift();
-          },
-
-          autoDetectShift: function () {
+          onTanggalOrShiftChange: function () {
             var self = this;
-            if (!self.form.waktu_mulai || _shiftsData.length === 0) return;
-            function toMins(hhmm) {
-              var p = hhmm.trim().split(":");
-              return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
-            }
-            var dtParts = self.form.waktu_mulai.split("T");
-            if (dtParts.length < 2) return;
-            var timeMins = toMins(dtParts[1].substring(0, 5));
+            if (!self.form.tanggal || !self.form.shift_id) return;
+            var selectedShift = null;
             for (var i = 0; i < _shiftsData.length; i++) {
-              var s = _shiftsData[i];
-              if (!s.time) continue;
-              var rp = s.time.split("-");
-              if (rp.length < 2) continue;
-              var sm = toMins(rp[0]),
-                em = toMins(rp[1]);
-              var matched =
-                sm <= em
-                  ? timeMins >= sm && timeMins < em
-                  : timeMins >= sm || timeMins < em;
-              if (matched) {
-                self.form.shift_id = s.id;
-                self.shiftDetected = true;
-                return;
+              if (_shiftsData[i].id == self.form.shift_id) {
+                selectedShift = _shiftsData[i];
+                break;
               }
             }
-            self.shiftDetected = false;
+            if (!selectedShift || !selectedShift.time) return;
+
+            var timeParts = selectedShift.time.split("-");
+            if (timeParts.length < 2) return;
+
+            function padTime(t) {
+              var p = t.trim().split(":");
+              if (p.length < 2) return t.trim();
+              return p[0].padStart(2, "0") + ":" + p[1].padStart(2, "0");
+            }
+
+            var startStr = padTime(timeParts[0]);
+            var endStr = padTime(timeParts[1]);
+
+            self.form.waktu_mulai = self.form.tanggal + "T" + startStr;
+
+            function toMins(hhmm) {
+              var p = hhmm.split(":");
+              return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
+            }
+
+            var startMins = toMins(startStr);
+            var endMins = toMins(endStr);
+
+            if (endMins <= startMins) {
+              var d = new Date(self.form.tanggal + "T00:00:00");
+              d.setDate(d.getDate() + 1);
+              var yyyy = d.getFullYear();
+              var mm = String(d.getMonth() + 1).padStart(2, "0");
+              var dd = String(d.getDate()).padStart(2, "0");
+              self.form.waktu_akhir = yyyy + "-" + mm + "-" + dd + "T" + endStr;
+            } else {
+              self.form.waktu_akhir = self.form.tanggal + "T" + endStr;
+            }
           },
 
           calcRow: function (idx) {
@@ -823,8 +848,9 @@
           },
 
           validate: function () {
+            if (!this.form.tanggal) return "Tanggal harus dipilih";
             if (!this.form.shift_id) return "Shift harus dipilih";
-            if (!this.form.waktu_mulai) return "Waktu mulai harus diisi";
+            if (!this.form.waktu_mulai) return "Waktu awal harus diisi";
             if (!this.form.waktu_akhir) return "Waktu akhir harus diisi";
             if (
               !this.rows.some(function (r) {

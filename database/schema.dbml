@@ -288,6 +288,71 @@ Table trx_penebusan_detail {
 }
 
 // ============================================================
+// TRANSACTION — PENJUALAN & PENYUSUTAN
+// ============================================================
+
+Table trx_penjualan {
+  id_penjualan          bigserial    [pk, increment]
+  no_penjualan          varchar(25)  [not null, unique]
+  shift_id              int          [not null, ref: > shifts.id]
+  waktu_mulai           timestamp    [not null]
+  waktu_akhir           timestamp    [not null]
+  total_rp_totalisator  bigint       [not null, default: 0]
+  total_penerimaan      bigint       [not null, default: 0]
+  aktual_uang           bigint       [not null, default: 0]
+  selisih               bigint       [not null, default: 0]
+  created               timestamp    [default: `now()`]
+  created_by            int          [null, ref: > users.id]
+  updated               timestamp    [default: `now()`]
+  updated_by            int          [null, ref: > users.id]
+}
+
+Table trx_penjualan_detail {
+  detail_penjualan_id  bigserial  [pk, increment]
+  penjualan_id         bigint     [not null, ref: > trx_penjualan.id_penjualan]
+  tiang_id             int        [not null, ref: > tiang.id]
+  nozzle_id            int        [not null, ref: > nozzles.id]
+  bbm_id               int        [not null, ref: > bbm.id]
+  bbm_price            bigint     [not null, default: 0]
+  margin               bigint     [not null, default: 0]
+  totalisator_awal     bigint     [not null, default: 0]
+  totalisator_akhir    bigint     [not null, default: 0]
+  jml_liter            bigint     [not null, default: 0]
+  jml_rupiah           bigint     [not null, default: 0]
+}
+
+Table trx_penjualan_pengeluaran_test {
+  id            bigserial  [pk, increment]
+  penjualan_id  bigint     [not null, ref: > trx_penjualan.id_penjualan]
+  jenis_test_id int        [not null, ref: > jenis_test.id]
+  bbm_id        int        [not null, ref: > bbm.id]
+  qty_liter     bigint     [not null, default: 0]
+  total_rupiah  bigint     [not null, default: 0]
+  created_at    timestamp  [default: `now()`]
+  updated_at    timestamp  [default: `now()`]
+}
+
+Table trx_penyusutan {
+  id_penyusutan    bigserial      [pk, increment]
+  penjualan_id     bigint         [not null, ref: > trx_penjualan.id_penjualan]
+  no_form          varchar(50)    [not null]
+  shift_id         int            [not null, ref: > shifts.id]
+  waktu            timestamp      [not null]
+  bbm_id           int            [not null, ref: > bbm.id]
+  first_stock      numeric(20,2)  [not null, default: 0]
+  endstock_actual  numeric(20,2)  [not null, default: 0]
+  endstock_booked  numeric(20,2)  [not null, default: 0]
+  created          timestamp      [default: `now()`]
+  created_by       int            [null, ref: > users.id]
+  updated          timestamp      [default: `now()`]
+  updated_by       int            [null, ref: > users.id]
+
+  indexes {
+    (penjualan_id, bbm_id) [unique, name: 'uni_trx_penyusutan_penjualan_bbm']
+  }
+}
+
+// ============================================================
 // ENUM NOTES (PostgreSQL — informational only)
 // ============================================================
 // tipe_pendapatan : nominal | persen
@@ -332,4 +397,8 @@ TableGroup config {
 TableGroup transaction {
   trx_penebusan
   trx_penebusan_detail
+  trx_penjualan
+  trx_penjualan_detail
+  trx_penjualan_pengeluaran_test
+  trx_penyusutan
 }

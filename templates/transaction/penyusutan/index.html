@@ -1,0 +1,642 @@
+{{ define "transaction/penyusutan/index.html" }} {{ template "header.html" . }}
+
+<div x-data="penyusutanPage()" class="space-y-5">
+
+  {{/* ── PAGE HEADER ─────────────────────────────────────────── */}}
+  <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div>
+      <h2 class="text-2xl font-bold text-slate-800">{{ .Title }}</h2>
+      <p class="text-slate-500 text-sm mt-1">Daily &amp; monthly report penyusutan BBM</p>
+    </div>
+
+    {{/* ── FILTER BUTTONS  ─────────────── */}}
+    <div class="flex items-center gap-2 flex-wrap">
+
+      {{/* — Daily Filter — */}}
+      <div class="relative bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm">
+        <button
+          type="button"
+          @click.prevent.stop="toggleDailyPicker()"
+          class="flex items-center gap-2 border border-slate-300 rounded-md px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-200"
+          :class="currentMode === 'daily' ? 'border-[#005596] bg-blue-50 text-[#005596] font-semibold' : ''"
+        >
+          <span class="text-slate-500">Daily:</span>
+          <span class="font-semibold" x-text="dailyLabel"></span>
+          <svg class="w-4 h-4 text-slate-500 transition-transform" :class="showDailyPicker ? 'rotate-180' : ''"
+            fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        <div
+          x-show="showDailyPicker"
+          x-transition
+          @click.outside="closeDailyPicker()"
+          class="absolute z-30 mt-2 left-0 w-72 bg-white border border-slate-200 rounded-xl shadow-xl p-4"
+          style="display: none"
+        >
+          <p class="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Pilih Tanggal</p>
+          <input
+            type="date"
+            x-model="dailyDate"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 mb-3"
+          />
+          <button
+            type="button"
+            @click="applyDaily()"
+            class="w-full px-4 py-2 bg-[#005596] hover:bg-blue-800 text-white rounded-lg text-sm font-semibold"
+          >
+            Tampilkan Laporan Daily
+          </button>
+        </div>
+      </div>
+
+      {{/* — Monthly Filter (persis seperti piutang/rekap) — */}}
+      <div class="relative bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm">
+        <button
+          type="button"
+          @click.prevent.stop="toggleMonthlyPicker()"
+          class="flex items-center gap-2 border border-slate-300 rounded-md px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-200"
+          :class="currentMode === 'monthly' ? 'border-[#005596] bg-blue-50 text-[#005596] font-semibold' : ''"
+        >
+          <span class="text-slate-500">Monthly:</span>
+          <span class="font-semibold" x-text="monthlyLabel"></span>
+          <svg class="w-4 h-4 text-slate-500 transition-transform" :class="showMonthlyPicker ? 'rotate-180' : ''"
+            fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        <div
+          x-show="showMonthlyPicker"
+          x-transition
+          @click.outside="closeMonthlyPicker()"
+          class="absolute z-30 mt-2 left-0 w-[320px] bg-white border border-slate-200 rounded-xl shadow-xl p-4"
+          style="display: none"
+        >
+          <div class="flex items-center justify-between mb-3">
+            <button type="button" @click.prevent.stop="pickerYear = pickerYear - 1"
+              class="px-2 py-1 text-slate-600 hover:bg-slate-100 rounded" title="Tahun sebelumnya">
+              &laquo;
+            </button>
+            <button type="button" @click.prevent.stop="showYearPicker = !showYearPicker"
+              class="text-sm font-bold text-slate-700 hover:text-blue-700"
+              x-text="pickerYear"></button>
+            <button type="button" @click.prevent.stop="pickerYear = pickerYear + 1"
+              class="px-2 py-1 text-slate-600 hover:bg-slate-100 rounded" title="Tahun berikutnya">
+              &raquo;
+            </button>
+          </div>
+
+          <template x-if="!showYearPicker">
+            <div class="grid grid-cols-3 gap-2">
+              <template x-for="opt in monthOptions" :key="opt.value">
+                <button
+                  type="button"
+                  @click.prevent.stop="selectMonthly(pickerYear, opt.value)"
+                  class="px-2 py-2 rounded-lg border text-sm font-medium transition"
+                  :class="(selectedMonthYear === String(pickerYear) && selectedMonthNum === opt.value)
+                    ? 'bg-[#005596] border-[#005596] text-white'
+                    : 'border-slate-200 text-slate-700 hover:bg-slate-50'"
+                  x-text="opt.label"
+                ></button>
+              </template>
+            </div>
+          </template>
+
+          <template x-if="showYearPicker">
+            <div class="grid grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-1">
+              <template x-for="year in yearOptions" :key="'year-' + year">
+                <button
+                  type="button"
+                  @click.prevent.stop="pickerYear = year; selectedMonthYear = String(year); showYearPicker = false"
+                  class="px-2 py-2 rounded-lg border text-sm font-medium transition"
+                  :class="selectedMonthYear === String(year)
+                    ? 'bg-[#005596] border-[#005596] text-white'
+                    : 'border-slate-200 text-slate-700 hover:bg-slate-50'"
+                  x-text="year"
+                ></button>
+              </template>
+            </div>
+          </template>
+        </div>
+      </div>
+
+    </div>{{/* end filter buttons */}}
+  </div>
+
+  {{/* ── REPORT SECTION ──────────────────────────────────────── */}}
+  {{ if .HasReport }}
+  <div class="glass-card bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+    <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+      <h3 class="font-semibold text-slate-700">Laporan Data Penyusutan</h3>
+      <span class="text-xs text-slate-500">Periode: {{ .PeriodLabel }}</span>
+    </div>
+
+    <div class="p-6">
+      {{ if not .ReportGroups }}
+      <div class="text-center py-10 text-slate-500">
+        Tidak ada data penyusutan pada periode yang dipilih.
+      </div>
+      {{ else }}
+      <div class="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-white">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm border-collapse border border-slate-300">
+            <thead>
+              <tr class="bg-slate-50 text-slate-700 font-bold text-xs uppercase">
+                <th class="border border-slate-300 px-3 py-2 text-left whitespace-nowrap">Waktu</th>
+                <th class="border border-slate-300 px-3 py-2 text-left whitespace-nowrap">Jenis BBM</th>
+                <th class="border border-slate-300 px-3 py-2 text-right whitespace-nowrap">Stock Awal</th>
+                <th class="border border-slate-300 px-3 py-2 text-right whitespace-nowrap">Total Penerimaan</th>
+                <th class="border border-slate-300 px-3 py-2 text-left whitespace-nowrap">DISP</th>
+                <th class="border border-slate-300 px-3 py-2 text-right whitespace-nowrap">Totalisator Awal</th>
+                <th class="border border-slate-300 px-3 py-2 text-right whitespace-nowrap">Totalisator Akhir</th>
+                <th class="border border-slate-300 px-3 py-2 text-right whitespace-nowrap">Total Penjualan</th>
+                <th class="border border-slate-300 px-3 py-2 text-right whitespace-nowrap bg-amber-50 text-amber-800">Density/Tera</th>
+                <th class="border border-slate-300 px-3 py-2 text-right whitespace-nowrap bg-amber-50 text-amber-800">Penjualan - Tera</th>
+                <th class="border border-slate-300 px-3 py-2 text-right whitespace-nowrap bg-green-50 text-green-800">Stock Akhir Aktual</th>
+                <th class="border border-slate-300 px-3 py-2 text-right whitespace-nowrap bg-green-50 text-green-800">Stock Akhir Catatan</th>
+                <th class="border border-slate-300 px-3 py-2 text-right whitespace-nowrap bg-red-50 text-red-800">Penyusutan</th>
+                <th class="border border-slate-300 px-3 py-2 text-right whitespace-nowrap bg-red-50 text-red-800">Persentasi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {{ range .ReportGroups }}
+                {{ $countRows := len .Rows }}
+                {{ $bbmName := .JenisBBM }}
+                {{ $bbmId := .BBMID }}
+                {{ $totalPenjualan := .TotalPenjualan }}
+                {{ $densityTera := .DensityTera }}
+                {{ $penjualanMinTera := .PenjualanMinTera }}
+                {{ $stockAkhirAktual := .StockAkhirAktual }}
+                {{ $stockAkhirCatatan := .StockAkhirCatatan }}
+                {{ $penyusutan := .Penyusutan }}
+                {{ $persentasi := .Persentasi }}
+                
+                {{ range $idx, $row := .Rows }}
+                <tr class="hover:bg-slate-50">
+                  {{ if eq $idx 0 }}
+                  <td rowspan="{{ $countRows }}" class="border border-slate-300 px-3 py-2 whitespace-nowrap align-middle">{{ $row.Waktu }}</td>
+                  <td rowspan="{{ $countRows }}" class="border border-slate-300 px-3 py-2 font-semibold align-middle">{{ $row.JenisBBM }}</td>
+                  <td rowspan="{{ $countRows }}" class="border border-slate-300 px-3 py-2 text-right font-mono align-middle">{{ printf "%.2f" $row.StockAwal }}</td>
+                  <td rowspan="{{ $countRows }}" class="border border-slate-300 px-3 py-2 text-right font-mono align-middle">{{ printf "%.2f" $row.TotalPenerimaan }}</td>
+                  {{ end }}
+                  <td class="border border-slate-300 px-3 py-2 whitespace-nowrap">{{ $row.Disp }}</td>
+                  <td class="border border-slate-300 px-3 py-2 text-right font-mono">{{ printf "%.2f" $row.TotalisatorAwal }}</td>
+                  <td class="border border-slate-300 px-3 py-2 text-right font-mono">{{ printf "%.2f" $row.TotalisatorAkhir }}</td>
+                  <td class="border border-slate-300 px-3 py-2 text-right font-mono">{{ printf "%.2f" $row.TotalPenjualan }}</td>
+                  <td class="border border-slate-300 px-3 py-2 text-center text-slate-400 bg-amber-50">-</td>
+                  <td class="border border-slate-300 px-3 py-2 text-center text-slate-400 bg-amber-50">-</td>
+                  <td class="border border-slate-300 px-3 py-2 text-center text-slate-400 bg-green-50">-</td>
+                  <td class="border border-slate-300 px-3 py-2 text-center text-slate-400 bg-green-50">-</td>
+                  <td class="border border-slate-300 px-3 py-2 text-center text-slate-400 bg-red-50">-</td>
+                  <td class="border border-slate-300 px-3 py-2 text-center text-slate-400 bg-red-50">-</td>
+                </tr>
+                {{ end }}
+                
+                {{/* — TOTAL ROW — */}}
+                <tr class="bg-[#BCE2EC] font-bold text-slate-800">
+                  <td colspan="7" class="border border-slate-300 px-3 py-2 text-right uppercase tracking-wide text-xs">
+                    TOTAL {{ $bbmName }}
+                  </td>
+                  <td class="border border-slate-300 px-3 py-2 text-right font-mono">
+                    {{ printf "%.2f" $totalPenjualan }}
+                  </td>
+                  <td class="border border-slate-300 px-3 py-2 text-right font-mono bg-amber-100">
+                    {{ printf "%.2f" $densityTera }}
+                  </td>
+                  <td class="border border-slate-300 px-3 py-2 text-right font-mono bg-amber-100">
+                    {{ printf "%.2f" $penjualanMinTera }}
+                  </td>
+                  <td class="border border-slate-300 px-3 py-2 text-right font-mono bg-green-100"
+                    id="aktual-display-{{ $bbmId }}">
+                    {{ printf "%.2f" $stockAkhirAktual }}
+                  </td>
+                  <td class="border border-slate-300 px-3 py-2 text-right font-mono bg-green-100">
+                    {{ printf "%.2f" $stockAkhirCatatan }}
+                  </td>
+                  <td class="border border-slate-300 px-3 py-2 text-right font-mono bg-red-100"
+                    id="penyusutan-display-{{ $bbmId }}">
+                    {{ printf "%.2f" $penyusutan }}
+                  </td>
+                  <td class="border border-slate-300 px-3 py-2 text-right font-mono bg-red-100"
+                    id="persen-display-{{ $bbmId }}"
+                    data-penjualan-min-tera="{{ printf "%.4f" $penjualanMinTera }}"
+                    data-endstock-catatan="{{ printf "%.4f" $stockAkhirCatatan }}">
+                    {{ printf "%.2f" $persentasi }}%
+                  </td>
+                </tr>
+              {{ end }}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {{ end }}
+    </div>
+  </div>
+
+  {{/* ── PER-SHIFT SECTION (Only in Daily Mode) ──────────────── */}}
+  {{ if eq .Mode "daily" }}
+  <div class="space-y-4">
+    <h3 class="text-lg font-bold text-slate-800 border-b border-slate-200 pb-2">Rincian Per-Shift</h3>
+
+    {{ if not .ShiftGroups }}
+    <div class="text-center py-10 text-slate-500 bg-white rounded-2xl border border-slate-200 shadow-sm">
+      Tidak ada data per-shift pada tanggal yang dipilih.
+    </div>
+    {{ end }}
+
+    {{ range $shiftIdx, $shiftGroup := .ShiftGroups }}
+    <div x-data="{ isOpen: false }" class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+      {{/* — Card Header — */}}
+      <button
+        type="button"
+        @click="isOpen = !isOpen"
+        class="w-full px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between hover:bg-slate-100 transition focus:outline-none"
+      >
+        <div class="flex items-center gap-3">
+          <span class="px-2.5 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-full">
+            {{ $shiftGroup.ShiftName }}
+          </span>
+          <span class="text-sm font-semibold text-slate-700">
+            No. Form: <span class="font-mono text-slate-500">{{ $shiftGroup.NoForm }}</span>
+          </span>
+          <span class="hidden md:inline text-xs text-slate-400">|</span>
+          <span class="text-xs text-slate-500">
+            Waktu: {{ $shiftGroup.WaktuMulai }} s/d {{ $shiftGroup.WaktuAkhir }}
+          </span>
+        </div>
+        <div>
+          <svg class="w-5 h-5 text-slate-500 transition-transform" :class="isOpen ? 'rotate-180' : ''"
+            fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </button>
+
+      {{/* — Card Body — */}}
+      <div x-show="isOpen" x-transition class="p-6" style="display: none">
+        {{ if not $shiftGroup.BBMGroups }}
+        <div class="text-center py-10 text-slate-500 bg-white rounded-xl border border-slate-200 shadow-sm">
+          Tidak ada rincian data untuk shift ini.
+        </div>
+        {{ else }}
+        <div class="border border-slate-200 rounded-xl overflow-hidden bg-white">
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs border-collapse border border-slate-200">
+              <thead>
+                <tr class="bg-slate-50 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
+                  <th class="border border-slate-200 px-3 py-2 text-center whitespace-nowrap w-12">Action</th>
+                  <th class="border border-slate-200 px-3 py-2 text-left whitespace-nowrap">Waktu</th>
+                  <th class="border border-slate-200 px-3 py-2 text-left whitespace-nowrap">Jenis BBM</th>
+                  <th class="border border-slate-200 px-3 py-2 text-right whitespace-nowrap">Stock Awal</th>
+                  <th class="border border-slate-200 px-3 py-2 text-right whitespace-nowrap">Total Penerimaan</th>
+                  <th class="border border-slate-200 px-3 py-2 text-left whitespace-nowrap">DISP</th>
+                  <th class="border border-slate-200 px-3 py-2 text-right whitespace-nowrap">Totalisator Awal</th>
+                  <th class="border border-slate-200 px-3 py-2 text-right whitespace-nowrap">Totalisator Akhir</th>
+                  <th class="border border-slate-200 px-3 py-2 text-right whitespace-nowrap">Total Penjualan</th>
+                  <th class="border border-slate-200 px-3 py-2 text-right whitespace-nowrap bg-amber-50/50 text-amber-800">Density/Tera</th>
+                  <th class="border border-slate-200 px-3 py-2 text-right whitespace-nowrap bg-amber-50/50 text-amber-800">Penjualan - Tera</th>
+                  <th class="border border-slate-200 px-3 py-2 text-right whitespace-nowrap bg-green-50/50 text-green-800">Stock Akhir Aktual</th>
+                  <th class="border border-slate-200 px-3 py-2 text-right whitespace-nowrap bg-green-50/50 text-green-800">Stock Akhir Catatan</th>
+                  <th class="border border-slate-200 px-3 py-2 text-right whitespace-nowrap bg-red-50/50 text-red-800">Penyusutan</th>
+                  <th class="border border-slate-200 px-3 py-2 text-right whitespace-nowrap bg-red-50/50 text-red-800">Persentasi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {{ range $bbmIdx, $bbmGroup := $shiftGroup.BBMGroups }}
+                  {{ $countNozle := len $bbmGroup.Nozzles }}
+                  {{ range $nozzleIdx, $nozzle := $bbmGroup.Nozzles }}
+                  <tr class="hover:bg-slate-50">
+                    {{ if eq $nozzleIdx 0 }}
+                    <td rowspan="{{ $countNozle }}" class="border border-slate-200 px-3 py-2 text-center align-middle whitespace-nowrap">
+                      {{ if $bbmGroup.PenyusutanID }}
+                      <button
+                        type="button"
+                        @click="openEditModal({{ $bbmGroup.PenyusutanID }}, '{{ $bbmGroup.JenisBBM }}', {{ $bbmGroup.StokAkhirAktual }})"
+                        class="flex items-center justify-center p-1.5 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-[#005596] hover:text-blue-900 rounded-lg transition shadow-sm mx-auto focus:outline-none"
+                        title="Input stok akhir aktual (penghitungan fisik tangki)"
+                      >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
+                      </button>
+                      {{ else }}
+                      -
+                      {{ end }}
+                    </td>
+                    <td rowspan="{{ $countNozle }}" class="border border-slate-200 px-3 py-2 whitespace-nowrap align-middle">{{ $shiftGroup.WaktuMulai }}</td>
+                    <td rowspan="{{ $countNozle }}" class="border border-slate-200 px-3 py-2 font-medium align-middle">{{ $bbmGroup.JenisBBM }}</td>
+                    <td rowspan="{{ $countNozle }}" class="border border-slate-200 px-3 py-2 text-right font-mono align-middle">{{ printf "%.2f" $bbmGroup.StokAwal }}</td>
+                    <td rowspan="{{ $countNozle }}" class="border border-slate-200 px-3 py-2 text-right font-mono align-middle">{{ printf "%.2f" $bbmGroup.TotalPenerimaan }}</td>
+                    {{ end }}
+                    <td class="border border-slate-200 px-3 py-2 whitespace-nowrap">{{ $nozzle.Disp }}</td>
+                    <td class="border border-slate-200 px-3 py-2 text-right font-mono">{{ printf "%.2f" $nozzle.TotalisatorAwal }}</td>
+                    <td class="border border-slate-200 px-3 py-2 text-right font-mono">{{ printf "%.2f" $nozzle.TotalisatorAkhir }}</td>
+                    <td class="border border-slate-200 px-3 py-2 text-right font-mono">{{ printf "%.2f" $nozzle.JmlLiter }}</td>
+                    <td class="border border-slate-200 px-3 py-2 text-center text-slate-400 bg-amber-50/20">-</td>
+                    <td class="border border-slate-200 px-3 py-2 text-center text-slate-400 bg-amber-50/20">-</td>
+                    <td class="border border-slate-200 px-3 py-2 text-center text-slate-400 bg-green-50/20">-</td>
+                    <td class="border border-slate-200 px-3 py-2 text-center text-slate-400 bg-green-50/20">-</td>
+                    <td class="border border-slate-200 px-3 py-2 text-center text-slate-400 bg-red-50/20">-</td>
+                    <td class="border border-slate-200 px-3 py-2 text-center text-slate-400 bg-red-50/20">-</td>
+                  </tr>
+                  {{ end }}
+
+                  {{/* — TOTAL ROW — */}}
+                  <tr class="bg-blue-50/70 font-bold text-slate-700">
+                    <td colspan="8" class="border border-slate-200 px-3 py-2 text-right uppercase tracking-wide text-[10px]">
+                      TOTAL {{ $bbmGroup.JenisBBM }}
+                    </td>
+                    <td class="border border-slate-200 px-3 py-2 text-right font-mono">
+                      {{ printf "%.2f" $bbmGroup.TotalPenjualan }}
+                    </td>
+                    <td class="border border-slate-200 px-3 py-2 text-right font-mono bg-amber-100/30">
+                      {{ printf "%.2f" $bbmGroup.DensityTera }}
+                    </td>
+                    <td class="border border-slate-200 px-3 py-2 text-right font-mono bg-amber-100/30">
+                      {{ printf "%.2f" $bbmGroup.PenjualanMinTera }}
+                    </td>
+                    <td class="border border-slate-200 px-3 py-2 text-right font-mono bg-green-100/30">
+                      {{ printf "%.2f" $bbmGroup.StokAkhirAktual }}
+                    </td>
+                    <td class="border border-slate-200 px-3 py-2 text-right font-mono bg-green-100/30">
+                      {{ printf "%.2f" $bbmGroup.StokAkhirCatatan }}
+                    </td>
+                    <td class="border border-slate-200 px-3 py-2 text-right font-mono bg-red-100/30">
+                      {{ printf "%.2f" $bbmGroup.Penyusutan }}
+                    </td>
+                    <td class="border border-slate-200 px-3 py-2 text-right font-mono bg-red-100/30">
+                      {{ printf "%.2f" $bbmGroup.Persentasi }}%
+                    </td>
+                  </tr>
+                {{ end }}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {{ end }}
+      </div>
+    </div>
+    {{ end }}
+  </div>
+  {{ end }}
+  {{ end }}{{/* end HasReport */}}
+
+  {{/* ── EMPTY STATE (belum pilih periode) ─────────────────── */}}
+  {{ if not .HasReport }}
+  <div class="glass-card bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center">
+    <div class="flex flex-col items-center gap-4">
+      <div class="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center">
+        <svg class="w-8 h-8 text-[#005596]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+            d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      </div>
+      <div>
+        <h3 class="text-lg font-bold text-slate-700">Pilih Periode Laporan</h3>
+        <p class="text-slate-400 text-sm mt-1">
+          Klik tombol <strong>Daily</strong> untuk laporan harian atau <strong>Monthly</strong> untuk laporan bulanan di pojok kanan atas.
+        </p>
+      </div>
+    </div>
+  </div>
+  {{ end }}
+
+</div>{{/* end x-data */}}
+
+{{/* ── MODAL EDIT STOK AKTUAL ─────────────────────────────────── */}}
+<div
+  id="modal-edit-aktual"
+  class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+  style="display: none"
+  x-data="editAktualModal()"
+>
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 relative">
+    <button @click="closeModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
+
+    <h3 class="text-lg font-bold text-slate-800 mb-1">Edit Stok Aktual</h3>
+    <p class="text-sm text-slate-500 mb-5" x-text="'Jenis BBM: ' + bbmName"></p>
+
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 mb-1">
+          Stok Akhir Aktual
+          <span class="font-normal text-slate-400">(penghitungan fisik tangki)</span>
+        </label>
+        <input
+          type="number"
+          step="0.01"
+          x-model="endstockActual"
+          class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+          placeholder="Masukkan stok aktual..."
+        />
+        <p class="text-xs text-slate-400 mt-1">
+          Stok catatan (booked) sudah dihitung otomatis dari transaksi.
+          Stok aktual diisi dari hasil penghitungan fisik di lapangan.
+          Penyusutan = Stok Catatan − Stok Aktual.
+        </p>
+      </div>
+    </div>
+
+    <div class="flex gap-3 mt-6">
+      <button
+        type="button"
+        @click="saveAktual()"
+        :disabled="saving"
+        class="flex-1 px-4 py-2 bg-[#005596] hover:bg-blue-800 disabled:opacity-50 text-white rounded-lg text-sm font-semibold transition"
+      >
+        <span x-show="!saving">Simpan Stok Aktual</span>
+        <span x-show="saving">Menyimpan...</span>
+      </button>
+      <button
+        type="button"
+        @click="closeModal()"
+        class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-semibold transition"
+      >
+        Batal
+      </button>
+    </div>
+
+    <div x-show="errorMsg" class="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700" x-text="errorMsg"></div>
+    <div x-show="successMsg" class="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg text-xs text-green-700" x-text="successMsg"></div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("alpine:init", function () {
+
+    // ─── Main Page State ─────────────────────────────────────
+    Alpine.data("penyusutanPage", function () {
+      var now = new Date();
+      var currentYear = now.getFullYear();
+      var currentMonth = String(now.getMonth() + 1).padStart(2, "0");
+      var currentDate = now.toISOString().split("T")[0];
+
+      // Read current state from URL
+      var params = new URLSearchParams(window.location.search);
+      var urlMode = params.get("mode") || "";
+      var urlDate = params.get("date") || currentDate;
+      var urlMonth = params.get("month") || (currentYear + "-" + currentMonth);
+
+      return {
+        currentMode: urlMode,
+        showDailyPicker: false,
+        showMonthlyPicker: false,
+        showYearPicker: false,
+
+        // Daily
+        dailyDate: urlDate,
+        dailyLabel: urlMode === "daily" ? formatDateLabel(urlDate) : "Pilih tanggal",
+
+        // Monthly
+        selectedMonthYear: urlMode === "monthly" ? urlMonth.split("-")[0] : String(currentYear),
+        selectedMonthNum: urlMode === "monthly" ? urlMonth.split("-")[1] : currentMonth,
+        pickerYear: urlMode === "monthly" ? Number(urlMonth.split("-")[0]) : currentYear,
+        monthlyLabel: urlMode === "monthly" ? formatMonthLabelFull(urlMonth) : "Pilih bulan",
+
+        monthOptions: [
+          { value: "01", label: "Januari" },
+          { value: "02", label: "Februari" },
+          { value: "03", label: "Maret" },
+          { value: "04", label: "April" },
+          { value: "05", label: "Mei" },
+          { value: "06", label: "Juni" },
+          { value: "07", label: "Juli" },
+          { value: "08", label: "Agustus" },
+          { value: "09", label: "September" },
+          { value: "10", label: "Oktober" },
+          { value: "11", label: "November" },
+          { value: "12", label: "Desember" },
+        ],
+        yearOptions: (function () {
+          var years = [];
+          for (var y = currentYear + 5; y >= currentYear - 10; y--) years.push(y);
+          return years;
+        })(),
+
+        toggleDailyPicker() {
+          this.showDailyPicker = !this.showDailyPicker;
+          if (this.showDailyPicker) this.showMonthlyPicker = false;
+        },
+        closeDailyPicker() { this.showDailyPicker = false; },
+
+        applyDaily() {
+          if (!this.dailyDate) return;
+          window.location.href = "/transaction/penyusutan?mode=daily&date=" + encodeURIComponent(this.dailyDate);
+        },
+
+        toggleMonthlyPicker() {
+          this.showMonthlyPicker = !this.showMonthlyPicker;
+          if (this.showMonthlyPicker) {
+            this.showDailyPicker = false;
+            this.showYearPicker = false;
+            this.pickerYear = Number(this.selectedMonthYear) || currentYear;
+          }
+        },
+        closeMonthlyPicker() {
+          this.showMonthlyPicker = false;
+          this.showYearPicker = false;
+        },
+
+        selectMonthly(year, monthNum) {
+          this.selectedMonthYear = String(year);
+          this.selectedMonthNum = String(monthNum).padStart(2, "0");
+          var val = this.selectedMonthYear + "-" + this.selectedMonthNum;
+          this.monthlyLabel = formatMonthLabelFull(val);
+          this.closeMonthlyPicker();
+          window.location.href = "/transaction/penyusutan?mode=monthly&month=" + encodeURIComponent(val);
+        },
+
+        // Trigger modal
+        openEditModal(psId, bbmName, currentActual) {
+          window._editAktualData = { psId, bbmName, currentActual };
+          var modal = document.getElementById("modal-edit-aktual");
+          if (modal) modal.style.display = "flex";
+          // Dispatch ke Alpine component modal
+          window.dispatchEvent(new CustomEvent("open-edit-aktual", {
+            detail: { psId, bbmName, currentActual }
+          }));
+        }
+      };
+    });
+
+    // ─── Modal Edit Stok Aktual ──────────────────────────────
+    Alpine.data("editAktualModal", function () {
+      return {
+        psId: null,
+        bbmName: "",
+        endstockActual: "",
+        saving: false,
+        errorMsg: "",
+        successMsg: "",
+
+        init() {
+          window.addEventListener("open-edit-aktual", (e) => {
+            this.psId = e.detail.psId;
+            this.bbmName = e.detail.bbmName;
+            this.endstockActual = e.detail.currentActual;
+            this.errorMsg = "";
+            this.successMsg = "";
+          });
+        },
+
+        closeModal() {
+          var modal = document.getElementById("modal-edit-aktual");
+          if (modal) modal.style.display = "none";
+          this.errorMsg = "";
+          this.successMsg = "";
+        },
+
+        async saveAktual() {
+          if (this.psId === null || this.psId === 0) {
+            this.errorMsg = "ID penyusutan tidak valid.";
+            return;
+          }
+          this.saving = true;
+          this.errorMsg = "";
+          this.successMsg = "";
+          try {
+            var resp = await fetch("/transaction/penyusutan/" + this.psId + "/actual", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ endstock_actual: parseFloat(this.endstockActual) || 0 }),
+            });
+            var json = await resp.json();
+            if (json.status === "success") {
+              this.successMsg = "Stok aktual berhasil diperbarui! Halaman akan direfresh...";
+              setTimeout(() => { window.location.reload(); }, 1200);
+            } else {
+              this.errorMsg = json.message || "Gagal menyimpan.";
+            }
+          } catch (e) {
+            this.errorMsg = "Terjadi kesalahan koneksi.";
+          } finally {
+            this.saving = false;
+          }
+        }
+      };
+    });
+  });
+
+  // ─── Helpers ────────────────────────────────────────────────
+  function formatDateLabel(val) {
+    if (!val || val.length < 10) return val || "Pilih tanggal";
+    var d = new Date(val + "T00:00:00");
+    return d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+  }
+
+  function formatMonthLabelFull(val) {
+    if (!val || val.length !== 7) return val || "Pilih bulan";
+    var parts = val.split("-");
+    var d = new Date(Number(parts[0]), Number(parts[1]) - 1, 1);
+    return d.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
+  }
+</script>
+
+{{ template "footer.html" . }} {{ end }}

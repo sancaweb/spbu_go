@@ -59,6 +59,11 @@
               <th
                 class="p-4 font-semibold text-slate-600 text-sm text-center border border-slate-200"
               >
+                Melewati Hari
+              </th>
+              <th
+                class="p-4 font-semibold text-slate-600 text-sm text-center border border-slate-200"
+              >
                 Aksi
               </th>
             </tr>
@@ -78,9 +83,25 @@
                 {{ $s.ShiftTime }}
               </td>
               <td class="p-4 text-center border border-slate-100">
+                {{ if $s.IsCrossDay }}
+                <span
+                  class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200"
+                >
+                  <svg class="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                  Ya
+                </span>
+                {{ else }}
+                <span
+                  class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full bg-slate-100 text-slate-600 border border-slate-200"
+                >
+                  Tidak
+                </span>
+                {{ end }}
+              </td>
+              <td class="p-4 text-center border border-slate-100">
                 <div class="flex justify-center gap-2">
                   <button
-                    @click="openEdit({{ $s.ID }}, '{{ $s.ShiftName }}', '{{ $s.ShiftTime }}')"
+                    @click="openEdit({{ $s.ID }}, '{{ $s.ShiftName }}', '{{ $s.ShiftTime }}', {{ $s.IsCrossDay }})"
                     class="px-3 py-1.5 text-xs font-medium bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg transition-colors"
                   >
                     Edit
@@ -96,7 +117,7 @@
             </tr>
             {{ else }}
             <tr>
-              <td colspan="4" class="p-8 text-center text-slate-400">
+              <td colspan="5" class="p-8 text-center text-slate-400">
                 Belum ada data shift
               </td>
             </tr>
@@ -153,6 +174,17 @@
             class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
+        <div class="flex items-center gap-2 pt-1">
+          <input
+            type="checkbox"
+            id="is_cross_day"
+            x-model="form.is_cross_day"
+            class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+          />
+          <label for="is_cross_day" class="text-sm font-medium text-slate-700 cursor-pointer select-none">
+            Melewati Hari Berikutnya (Overnight)
+          </label>
+        </div>
         <div class="flex justify-end gap-3 pt-2">
           <button
             type="button"
@@ -180,17 +212,17 @@
       modalOpen: false,
       loading: false,
       editId: null,
-      form: { shift_name: "", shift_time: "" },
+      form: { shift_name: "", shift_time: "", is_cross_day: false },
 
       openCreate() {
         this.editId = null;
-        this.form = { shift_name: "", shift_time: "" };
+        this.form = { shift_name: "", shift_time: "", is_cross_day: false };
         this.modalOpen = true;
       },
 
-      openEdit(id, name, time) {
+      openEdit(id, name, time, isCrossDay) {
         this.editId = id;
-        this.form = { shift_name: name, shift_time: time };
+        this.form = { shift_name: name, shift_time: time, is_cross_day: !!isCrossDay };
         this.modalOpen = true;
       },
 
@@ -200,7 +232,11 @@
 
       async submitForm() {
         this.loading = true;
-        const body = new URLSearchParams(this.form);
+        const body = new URLSearchParams();
+        body.append("shift_name", this.form.shift_name);
+        body.append("shift_time", this.form.shift_time);
+        body.append("is_cross_day", this.form.is_cross_day ? "true" : "false");
+
         const url = this.editId
           ? `/master/shift/${this.editId}`
           : "/master/shift";

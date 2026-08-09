@@ -2,28 +2,30 @@ package entity
 
 import "time"
 
-// TrxPenyusutan — pencatatan penyusutan / susut BBM harian per shift.
-// Penyusutan terjadi karena penguapan, selisih takaran, atau kebocoran kecil.
+// TrxPenyusutan — snapshot laporan penyusutan BBM berbasis transaksi penjualan.
 type TrxPenyusutan struct {
-	ID uint64 `gorm:"primaryKey;column:id_penyusutan" json:"id"`
+	ID uint64 `gorm:"primaryKey;column:id_penyusutan" json:"id_penyusutan"`
 
-	// Nomor dokumen (auto: PST/YYYY/MM/NNNN)
-	NoPenyusutan string `gorm:"column:no_penyusutan;type:varchar(25);uniqueIndex:uni_trx_penyusutan_no;not null" json:"no_penyusutan"`
+	// Referensi dokumen penjualan (header)
+	PenjualanID uint64        `gorm:"column:penjualan_id;not null;index" json:"penjualan_id"`
+	Penjualan   *TrxPenjualan `gorm:"foreignKey:PenjualanID" json:"penjualan,omitempty"`
 
-	// Referensi shift & tanggal
-	TglPenyusutan time.Time `gorm:"column:tgl_penyusutan;type:date;not null" json:"tgl_penyusutan"`
-	ShiftID       uint      `gorm:"column:shift_id;not null" json:"shift_id"`
-	Shift         *Shift    `gorm:"foreignKey:ShiftID" json:"shift,omitempty"`
+	// Nomor form laporan penyusutan
+	NoForm string `gorm:"column:no_form;type:varchar(50);not null" json:"no_form"`
+
+	// Referensi shift & waktu pencatatan
+	ShiftID uint      `gorm:"column:shift_id;not null" json:"shift_id"`
+	Shift   *Shift    `gorm:"foreignKey:ShiftID" json:"shift,omitempty"`
+	Waktu   time.Time `gorm:"column:waktu;type:timestamp;not null;index" json:"waktu"`
 
 	// BBM yang mengalami penyusutan
 	BBMID uint `gorm:"column:bbm_id;not null" json:"bbm_id"`
 	BBM   *BBM `gorm:"foreignKey:BBMID" json:"bbm,omitempty"`
 
-	// Volume & nilai
-	JmlLiter    int64  `gorm:"column:jml_liter;type:bigint;not null;default:0" json:"jml_liter"`       // satuan: liter (integer, bisa × desimal)
-	HargaDasar  int64  `gorm:"column:harga_dasar;type:bigint;not null;default:0" json:"harga_dasar"`   // harga dasar per liter saat itu
-	NilaiRupiah int64  `gorm:"column:nilai_rupiah;type:bigint;not null;default:0" json:"nilai_rupiah"` // jml_liter × harga_dasar
-	Keterangan  string `gorm:"column:keterangan;type:text" json:"keterangan"`
+	// Snapshot stok
+	FirstStock     float64 `gorm:"column:first_stock;type:numeric(20,2);not null;default:0" json:"first_stock"`
+	EndstockActual float64 `gorm:"column:endstock_actual;type:numeric(20,2);not null;default:0" json:"endstock_actual"`
+	EndstockBooked float64 `gorm:"column:endstock_booked;type:numeric(20,2);not null;default:0" json:"endstock_booked"`
 
 	// Audit
 	Created   time.Time `gorm:"column:created;autoCreateTime" json:"created"`

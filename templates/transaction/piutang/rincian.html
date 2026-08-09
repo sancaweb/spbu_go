@@ -352,7 +352,12 @@
                   return meta.row + meta.settings._iDisplayStart + 1;
                 },
               },
-              { data: "tgl" },
+              {
+                data: "tgl",
+                render: function (v) {
+                  return self.formatDisplayDate(v);
+                },
+              },
               { data: "partner_name" },
               { data: "no_voucher", defaultContent: "-" },
               { data: "no_pol", defaultContent: "-" },
@@ -471,6 +476,33 @@
             this.filter.waktu_akhir ||
             this.filter.status_pembayaran
           );
+        },
+
+        formatDisplayDate: function (v) {
+          if (!v) return "-";
+          var source = String(v);
+          var datePart = source.includes("T") ? source.split("T")[0] : source;
+          var parts = datePart.split("-");
+          if (parts.length !== 3) return source;
+          var day = parts[2];
+          var month = Number(parts[1]);
+          var year = parts[0];
+          var shortMonths = [
+            "Jan",
+            "Feb",
+            "Mar",
+            "Apr",
+            "Mei",
+            "Jun",
+            "Jul",
+            "Agu",
+            "Sep",
+            "Okt",
+            "Nov",
+            "Des",
+          ];
+          var mon = shortMonths[month - 1] || parts[1];
+          return day + " " + mon + " " + year;
         },
       };
     });

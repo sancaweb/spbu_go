@@ -182,6 +182,26 @@
               </div>
             </div>
 
+            <div class="flex items-center justify-between gap-3">
+              <div class="text-xs">
+                <span class="font-semibold text-slate-600">Total Detail:</span>
+                <span class="font-bold text-[#005596]" x-text="'Rp ' + formatIDR(detailLineTotal)"></span>
+                <template x-if="isDetailMismatch">
+                  <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">
+                    Tidak sesuai (selisih Rp <span class="ml-1" x-text="formatIDR(detailDifference)"></span>)
+                  </span>
+                </template>
+              </div>
+              <button
+                type="button"
+                x-show="isDetailMismatch"
+                @click="startAddDetailRow()"
+                class="px-3 py-1.5 text-xs font-bold bg-blue-50 text-[#005596] border border-blue-100 hover:bg-blue-100 rounded-lg"
+              >
+                Tambah Detail
+              </button>
+            </div>
+
             <div class="overflow-x-auto">
               <table class="w-full text-sm border-collapse">
                 <thead>
@@ -193,11 +213,12 @@
                     <th class="px-3 py-2 text-right border border-slate-200">Qty</th>
                     <th class="px-3 py-2 text-right border border-slate-200">Harga/L</th>
                     <th class="px-3 py-2 text-right border border-slate-200">Total</th>
+                    <th class="px-3 py-2 text-center border border-slate-200">Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <template x-for="d in detail.details" :key="d.id_piutang_detail">
-                    <tr class="hover:bg-slate-50">
+                  <template x-for="d in detail.details" :key="'view-' + d.id_piutang_detail">
+                    <tr class="hover:bg-slate-50" x-show="!isEditingDetail(d.id_piutang_detail)">
                       <td class="px-3 py-2 border border-slate-100" x-text="d.no_voucher || '-'"></td>
                       <td class="px-3 py-2 border border-slate-100" x-text="d.no_pol || '-'"></td>
                       <td class="px-3 py-2 border border-slate-100" x-text="d.driver_name || '-'"></td>
@@ -205,8 +226,65 @@
                       <td class="px-3 py-2 border border-slate-100 text-right" x-text="formatIDR(d.qty_liter) + ' L'"></td>
                       <td class="px-3 py-2 border border-slate-100 text-right" x-text="'Rp ' + formatIDR(d.harga_bbm)"></td>
                       <td class="px-3 py-2 border border-slate-100 text-right font-semibold text-[#005596]" x-text="'Rp ' + formatIDR(d.total_line)"></td>
+                      <td class="px-3 py-2 border border-slate-100 text-center">
+                        <button
+                          type="button"
+                          @click="startEditDetailRow(d)"
+                          class="px-2 py-1 text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 rounded hover:bg-amber-100"
+                        >
+                          Edit
+                        </button>
+                      </td>
                     </tr>
                   </template>
+
+                  <template x-for="d in detail.details" :key="'edit-' + d.id_piutang_detail">
+                    <tr class="bg-amber-50/40" x-show="isEditingDetail(d.id_piutang_detail)">
+                      <td class="px-2 py-2 border border-slate-100"><input x-model="detailEditRows[d.id_piutang_detail].no_voucher" type="text" class="w-28 border rounded px-2 py-1" /></td>
+                      <td class="px-2 py-2 border border-slate-100"><input x-model="detailEditRows[d.id_piutang_detail].no_pol" type="text" class="w-24 border rounded px-2 py-1 uppercase" /></td>
+                      <td class="px-2 py-2 border border-slate-100"><input x-model="detailEditRows[d.id_piutang_detail].driver_name" type="text" class="w-32 border rounded px-2 py-1" /></td>
+                      <td class="px-2 py-2 border border-slate-100">
+                        <select x-model="detailEditRows[d.id_piutang_detail].bbm_id" @change="applyDetailBBM(detailEditRows[d.id_piutang_detail])" class="w-36 border rounded px-2 py-1">
+                          <option value="">Pilih BBM</option>
+                          <template x-for="b in bbmOptions" :key="'edit-bbm-' + b.id">
+                            <option :value="String(b.id)" x-text="b.name"></option>
+                          </template>
+                        </select>
+                      </td>
+                      <td class="px-2 py-2 border border-slate-100"><input x-model="detailEditRows[d.id_piutang_detail].qty_liter" @input="calcDetailRow(detailEditRows[d.id_piutang_detail])" type="number" min="0" class="w-20 border rounded px-2 py-1 text-right" /></td>
+                      <td class="px-2 py-2 border border-slate-100"><input x-model="detailEditRows[d.id_piutang_detail].harga_bbm" @input="calcDetailRow(detailEditRows[d.id_piutang_detail])" type="number" min="0" class="w-24 border rounded px-2 py-1 text-right" /></td>
+                      <td class="px-2 py-2 border border-slate-100 text-right font-semibold text-[#005596]" x-text="'Rp ' + formatIDR(detailEditRows[d.id_piutang_detail].total_line || 0)"></td>
+                      <td class="px-2 py-2 border border-slate-100 text-center">
+                        <div class="flex items-center justify-center gap-1">
+                          <button type="button" @click="saveEditedDetailRow(d.id_piutang_detail)" class="px-2 py-1 text-xs font-semibold bg-green-50 text-green-700 border border-green-200 rounded hover:bg-green-100">Save</button>
+                          <button type="button" @click="cancelEditDetailRow(d.id_piutang_detail)" class="px-2 py-1 text-xs font-semibold bg-slate-50 text-slate-700 border border-slate-200 rounded hover:bg-slate-100">Batal</button>
+                        </div>
+                      </td>
+                    </tr>
+                  </template>
+
+                  <tr x-show="detailAddRow" class="bg-blue-50/40">
+                    <td class="px-2 py-2 border border-slate-100"><input x-model="detailAddRow.no_voucher" type="text" class="w-28 border rounded px-2 py-1" /></td>
+                    <td class="px-2 py-2 border border-slate-100"><input x-model="detailAddRow.no_pol" type="text" class="w-24 border rounded px-2 py-1 uppercase" /></td>
+                    <td class="px-2 py-2 border border-slate-100"><input x-model="detailAddRow.driver_name" type="text" class="w-32 border rounded px-2 py-1" /></td>
+                    <td class="px-2 py-2 border border-slate-100">
+                      <select x-model="detailAddRow.bbm_id" @change="applyDetailBBM(detailAddRow)" class="w-36 border rounded px-2 py-1">
+                        <option value="">Pilih BBM</option>
+                        <template x-for="b in bbmOptions" :key="'add-bbm-' + b.id">
+                          <option :value="String(b.id)" x-text="b.name"></option>
+                        </template>
+                      </select>
+                    </td>
+                    <td class="px-2 py-2 border border-slate-100"><input x-model="detailAddRow.qty_liter" @input="calcDetailRow(detailAddRow)" type="number" min="0" class="w-20 border rounded px-2 py-1 text-right" /></td>
+                    <td class="px-2 py-2 border border-slate-100"><input x-model="detailAddRow.harga_bbm" @input="calcDetailRow(detailAddRow)" type="number" min="0" class="w-24 border rounded px-2 py-1 text-right" /></td>
+                    <td class="px-2 py-2 border border-slate-100 text-right font-semibold text-[#005596]" x-text="'Rp ' + formatIDR(detailAddRow.total_line || 0)"></td>
+                    <td class="px-2 py-2 border border-slate-100 text-center">
+                      <div class="flex items-center justify-center gap-1">
+                        <button type="button" @click="saveNewDetailRow()" class="px-2 py-1 text-xs font-semibold bg-green-50 text-green-700 border border-green-200 rounded hover:bg-green-100">Save</button>
+                        <button type="button" @click="cancelAddDetailRow()" class="px-2 py-1 text-xs font-semibold bg-slate-50 text-slate-700 border border-slate-200 rounded hover:bg-slate-100">Batal</button>
+                      </div>
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -309,6 +387,13 @@
   </div>
 </div>
 
+<select id="detail-bbm-source" class="hidden">
+  <option value="">Pilih BBM</option>
+  {{ range .BBMs }}
+  <option value="{{ .ID }}" data-id="{{ .ID }}" data-name="{{ .Name }}" data-price="{{ printf "%.0f" .Price }}" data-margin="{{ printf "%.0f" .Margin }}">{{ .Name }}</option>
+  {{ end }}
+</select>
+
 <link rel="stylesheet" href="/static/vendor/jquery.dataTables.min.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
@@ -369,6 +454,7 @@
         saving: false,
         filterLoading: false,
         stats: { total_piutang: 0, total_unpaid: 0, nilai_unpaid: 0, nilai_total: 0 },
+        bbmOptions: [],
         filter: {
           partner_id: "",
           waktu_mulai: "",
@@ -377,9 +463,29 @@
           status_kesesuaian: "",
         },
         form: { penjualan_id: "", pelanggan_id: "", details: [] },
+        detailEditRows: {},
+        detailAddRow: null,
+
+        get detailLineTotal() {
+          if (!this.detail || !Array.isArray(this.detail.details)) return 0;
+          return this.detail.details.reduce(function (sum, row) {
+            return sum + Number(row.total_line || 0);
+          }, 0);
+        },
+
+        get detailDifference() {
+          if (!this.detail) return 0;
+          return Math.abs(Number(this.detail.total_tagihan || 0) - Number(this.detailLineTotal || 0));
+        },
+
+        get isDetailMismatch() {
+          if (!this.detail) return false;
+          return Number(this.detail.total_tagihan || 0) !== Number(this.detailLineTotal || 0);
+        },
 
         init: function () {
           window._piutangApp = this;
+          this.prepareBBMOptions();
           this.loadSummary();
           this.initDataTable();
 
@@ -404,6 +510,23 @@
           } catch (e) {}
         },
 
+        prepareBBMOptions: function () {
+          var source = document.getElementById("detail-bbm-source");
+          if (!source) return;
+          var options = [];
+          Array.from(source.options).forEach(function (opt) {
+            var id = Number(opt.dataset.id || 0);
+            if (!id) return;
+            options.push({
+              id: id,
+              name: opt.dataset.name || opt.text || "",
+              price: Number(opt.dataset.price || 0),
+              margin: Number(opt.dataset.margin || 0),
+            });
+          });
+          this.bbmOptions = options;
+        },
+
         initDataTable: function () {
           var self = this;
           if ($.fn.DataTable.isDataTable("#piutang-table")) {
@@ -426,7 +549,12 @@
             },
             columns: [
               { data: null, orderable: false, searchable: false, render: function (_, __, ___, meta) { return meta.row + meta.settings._iDisplayStart + 1; } },
-              { data: "tgl" },
+              {
+                data: "tgl",
+                render: function (v) {
+                  return self.formatDisplayDate(v);
+                },
+              },
               { data: "partner_name" },
               { data: "shift_name" },
               { data: "total_tagihan", className: "text-right", render: function (v) { return "Rp " + formatIDR(v); } },
@@ -474,6 +602,8 @@
 
         loadDetail: async function (id) {
           this.detail = null;
+          this.detailEditRows = {};
+          this.detailAddRow = null;
           this.showDetail = true;
           try {
             var res = await fetch("/transaction/piutang/" + id + "/detail");
@@ -481,6 +611,146 @@
             this.detail = json.data;
           } catch (e) {
             this.detail = null;
+          }
+        },
+
+        reloadCurrentDetail: async function () {
+          if (!this.detail || !this.detail.id_piutang) return;
+          var id = this.detail.id_piutang;
+          var res = await fetch("/transaction/piutang/" + id + "/detail");
+          var json = await res.json();
+          this.detail = json.data;
+        },
+
+        isEditingDetail: function (detailID) {
+          return !!this.detailEditRows[detailID];
+        },
+
+        startEditDetailRow: function (d) {
+          this.detailEditRows[d.id_piutang_detail] = {
+            penjualan_id: Number(d.penjualan_id || (this.detail && this.detail.penjualan_id) || 0),
+            no_voucher: d.no_voucher || "",
+            no_pol: d.no_pol || "",
+            driver_name: d.driver_name || "",
+            bbm_id: String(d.bbm_id || (d.bbm && d.bbm.id) || ""),
+            harga_bbm: Number(d.harga_bbm || 0),
+            margin: Number(d.margin || 0),
+            qty_liter: Number(d.qty_liter || 0),
+            total_line: Number(d.total_line || 0),
+          };
+          this.detailEditRows = Object.assign({}, this.detailEditRows);
+        },
+
+        cancelEditDetailRow: function (detailID) {
+          delete this.detailEditRows[detailID];
+          this.detailEditRows = Object.assign({}, this.detailEditRows);
+        },
+
+        calcDetailRow: function (row) {
+          row.total_line = Number(row.harga_bbm || 0) * Number(row.qty_liter || 0);
+        },
+
+        applyDetailBBM: function (row) {
+          var bbm = this.bbmOptions.find(function (x) {
+            return String(x.id) === String(row.bbm_id);
+          });
+          if (!bbm) return;
+          if (!Number(row.harga_bbm || 0)) row.harga_bbm = Number(bbm.price || 0);
+          if (!Number(row.margin || 0)) row.margin = Number(bbm.margin || 0);
+          this.calcDetailRow(row);
+        },
+
+        startAddDetailRow: function () {
+          if (!this.detail) return;
+          this.detailAddRow = {
+            penjualan_id: Number(this.detail.penjualan_id || 0),
+            no_voucher: "",
+            no_pol: "",
+            driver_name: "",
+            bbm_id: "",
+            harga_bbm: 0,
+            margin: 0,
+            qty_liter: 0,
+            total_line: 0,
+          };
+        },
+
+        cancelAddDetailRow: function () {
+          this.detailAddRow = null;
+        },
+
+        saveEditedDetailRow: async function (detailID) {
+          if (!this.detail || !this.detail.id_piutang) return;
+          var row = this.detailEditRows[detailID];
+          if (!row) return;
+          if (!row.bbm_id || Number(row.qty_liter) <= 0 || Number(row.harga_bbm) <= 0) {
+            Swal.fire("Error", "BBM, qty liter, dan harga BBM wajib diisi", "error");
+            return;
+          }
+          try {
+            var payload = {
+              penjualan_id: Number(row.penjualan_id || this.detail.penjualan_id || 0),
+              no_voucher: row.no_voucher || "",
+              no_pol: row.no_pol || "",
+              driver_name: row.driver_name || "",
+              bbm_id: Number(row.bbm_id),
+              harga_bbm: Number(row.harga_bbm),
+              margin: Number(row.margin || 0),
+              qty_liter: Number(row.qty_liter),
+            };
+            var res = await fetch("/transaction/piutang/" + this.detail.id_piutang + "/detail/" + detailID, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            var json = await res.json();
+            if (json.status === "success") {
+              this.cancelEditDetailRow(detailID);
+              await this.reloadCurrentDetail();
+              if (this.dt) this.dt.ajax.reload(null, false);
+              Swal.fire({ icon: "success", title: "Berhasil", text: json.message, timer: 1200, showConfirmButton: false });
+            } else {
+              Swal.fire("Gagal", json.message || "Gagal menyimpan detail", "error");
+            }
+          } catch (e) {
+            Swal.fire("Error", e.message || "Terjadi kesalahan", "error");
+          }
+        },
+
+        saveNewDetailRow: async function () {
+          if (!this.detail || !this.detail.id_piutang || !this.detailAddRow) return;
+          var row = this.detailAddRow;
+          if (!row.bbm_id || Number(row.qty_liter) <= 0 || Number(row.harga_bbm) <= 0) {
+            Swal.fire("Error", "BBM, qty liter, dan harga BBM wajib diisi", "error");
+            return;
+          }
+          try {
+            var payload = {
+              penjualan_id: Number(row.penjualan_id || this.detail.penjualan_id || 0),
+              no_voucher: row.no_voucher || "",
+              no_pol: row.no_pol || "",
+              driver_name: row.driver_name || "",
+              bbm_id: Number(row.bbm_id),
+              harga_bbm: Number(row.harga_bbm),
+              margin: Number(row.margin || 0),
+              qty_liter: Number(row.qty_liter),
+            };
+            var res = await fetch("/transaction/piutang/" + this.detail.id_piutang + "/detail", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            var json = await res.json();
+            if (json.status === "success") {
+              this.detailAddRow = null;
+              await this.reloadCurrentDetail();
+              if (this.dt) this.dt.ajax.reload(null, false);
+              Swal.fire({ icon: "success", title: "Berhasil", text: json.message, timer: 1200, showConfirmButton: false });
+            } else {
+              Swal.fire("Gagal", json.message || "Gagal menambah detail", "error");
+            }
+          } catch (e) {
+            Swal.fire("Error", e.message || "Terjadi kesalahan", "error");
           }
         },
 
@@ -628,6 +898,19 @@
           } catch (e) {
             Swal.fire("Error", e.message, "error");
           }
+        },
+        formatDisplayDate: function (v) {
+          if (!v) return "-";
+          var source = String(v);
+          var datePart = source.includes("T") ? source.split("T")[0] : source;
+          var parts = datePart.split("-");
+          if (parts.length !== 3) return source;
+          var day = parts[2];
+          var month = Number(parts[1]);
+          var year = parts[0];
+          var shortMonths = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+          var mon = shortMonths[month - 1] || parts[1];
+          return day + " " + mon + " " + year;
         },
         formatIDR: function (v) { return formatIDR(v); },
       };

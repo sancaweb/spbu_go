@@ -540,12 +540,14 @@ func seedEmployees() {
 func seedShifts() {
 	db := database.DB
 	shifts := []entity.Shift{
-		{ShiftName: "Shift 1", ShiftTime: "07:00 - 15:00"},
-		{ShiftName: "Shift 2", ShiftTime: "15:00 - 23:00"},
-		{ShiftName: "Shift 3", ShiftTime: "23:00 - 07:00"},
+		{ShiftName: "Shift 1", ShiftTime: "06:00 - 13:59", IsCrossDay: false},
+		{ShiftName: "Shift 2", ShiftTime: "14:00 - 20:59", IsCrossDay: false},
+		{ShiftName: "Shift 3", ShiftTime: "21:00 - 05:59", IsCrossDay: true},
 	}
 	for i := range shifts {
-		db.Where(entity.Shift{ShiftName: shifts[i].ShiftName}).FirstOrCreate(&shifts[i])
+		db.Where("shift_name = ?", shifts[i].ShiftName).
+			Assign(entity.Shift{ShiftTime: shifts[i].ShiftTime, IsCrossDay: shifts[i].IsCrossDay}).
+			FirstOrCreate(&shifts[i])
 	}
 	log.Println("Shift data seeded successfully")
 }
@@ -1012,57 +1014,48 @@ func seedPenyusutan() {
 		return
 	}
 
-	// Ambil referensi
-	var shifts []entity.Shift
-	db.Order("id ASC").Find(&shifts)
-	var bbmList []entity.BBM
-	db.Where("is_active = ?", true).Order("id ASC").Find(&bbmList)
-	if len(shifts) == 0 || len(bbmList) == 0 {
-		log.Println("Penyusutan seeder: data referensi tidak cukup, skip")
+	// Ambil referensi dari penjualan agar sesuai schema baru (wajib punya penjualan_id)
+	var penjualanList []entity.TrxPenjualan
+	db.Order("waktu_mulai ASC").Limit(10).Find(&penjualanList)
+	if len(penjualanList) == 0 {
+		log.Println("Penyusutan seeder: tidak ada data penjualan, skip")
 		return
 	}
 
-	keterangans := []string{
-		"Susut penguapan normal",
-		"Selisih takaran nozzle",
-		"Penyusutan akibat suhu tinggi",
-		"Selisih totalisator vs dip test",
-		"Kebocoran minor tangki",
+	var bbmList []entity.BBM
+	db.Where("is_active = ?", true).Order("id ASC").Find(&bbmList)
+	if len(bbmList) == 0 {
+		log.Println("Penyusutan seeder: tidak ada BBM aktif, skip")
+		return
 	}
 
-	baseDate := time.Date(2026, 1, 1, 0, 0, 0, 0, time.Local)
 	seeded := 0
-	seq := 1
-	for day := 0; day < 10; day++ {
-		tgl := baseDate.AddDate(0, 0, day)
-		// 1-2 record penyusutan per hari, per jenis BBM berbeda
-		numRecords := 1 + day%2
-		for r := 0; r < numRecords; r++ {
-			bbm := bbmList[(day+r)%len(bbmList)]
-			shift := shifts[(day+r)%len(shifts)]
-			hargaDasar := int64(bbm.Price) - int64(bbm.Margin)
-			// Penyusutan kecil: 5-50 liter
-			jmlLiter := int64(5 + (day*3+r*7)%46)
-			nilaiRupiah := jmlLiter * hargaDasar
+	for i, p := range penjualanList {
+		bbm := bbmList[i%len(bbmList)]
+		firstStock := float64(8000 + (i * 300))
+		totalPenjualan := float64(3500 + (i * 120))
+		density := float64(100 + (i * 7 % 60))
+		totalPenerimaan := float64(7000 + (i * 200))
+		penjualanTera := totalPenjualan - density
+		endBooked := firstStock + totalPenerimaan - penjualanTera
+		endActual := endBooked - float64((i*5)%80)
 
-			pst := entity.TrxPenyusutan{
-				NoPenyusutan:  fmt.Sprintf("PST/%04d/%02d/%04d", tgl.Year(), int(tgl.Month()), seq),
-				TglPenyusutan: tgl,
-				ShiftID:       shift.ID,
-				BBMID:         bbm.ID,
-				JmlLiter:      jmlLiter,
-				HargaDasar:    hargaDasar,
-				NilaiRupiah:   nilaiRupiah,
-				Keterangan:    keterangans[(day+r)%len(keterangans)],
-			}
-
-			if err := db.Omit("Shift", "BBM", "Creator", "Updater").Create(&pst).Error; err != nil {
-				log.Printf("Failed to seed penyusutan %s: %v", pst.NoPenyusutan, err)
-				continue
-			}
-			seq++
-			seeded++
+		pst := entity.TrxPenyusutan{
+			PenjualanID:    p.ID,
+			NoForm:         fmt.Sprintf("PST/%04d/%02d/%04d", p.WaktuMulai.Year(), int(p.WaktuMulai.Month()), i+1),
+			ShiftID:        p.ShiftID,
+			Waktu:          p.WaktuMulai,
+			BBMID:          bbm.ID,
+			FirstStock:     firstStock,
+			EndstockActual: endActual,
+			EndstockBooked: endBooked,
 		}
+
+		if err := db.Omit("Penjualan", "Shift", "BBM", "Creator", "Updater").Create(&pst).Error; err != nil {
+			log.Printf("Failed to seed penyusutan penjualan_id=%d: %v", p.ID, err)
+			continue
+		}
+		seeded++
 	}
 	log.Printf("Seeded %d penyusutan records", seeded)
 }

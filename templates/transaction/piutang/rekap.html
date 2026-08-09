@@ -12,18 +12,97 @@
     </div>
     <div class="flex items-center gap-2">
       <div
-        class="bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm flex items-center gap-2"
+        class="relative bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm"
       >
-        <label for="bulan-filter" class="text-sm font-medium text-slate-600"
-          >Periode Bulan</label
+        <button
+          type="button"
+          @click.prevent.stop="togglePeriodPicker()"
+          class="flex items-center gap-2 border border-slate-300 rounded-md px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-200"
         >
-        <input
-          id="bulan-filter"
-          type="month"
-          x-model="selectedMonth"
-          @change="applyMonthFilter()"
-          class="border border-slate-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
-        />
+          <span class="text-slate-500">Periode:</span>
+          <span class="font-semibold" x-text="monthLabel"></span>
+          <svg
+            class="w-4 h-4 text-slate-500 transition-transform"
+            :class="showPeriodPicker ? 'rotate-180' : ''"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
+        </button>
+
+        <div
+          x-show="showPeriodPicker"
+          x-transition
+          @click.outside="closePeriodPicker()"
+          class="absolute z-30 mt-2 left-0 w-[320px] bg-white border border-slate-200 rounded-xl shadow-xl p-4"
+          style="display: none"
+        >
+          <div class="flex items-center justify-between mb-3">
+            <button
+              type="button"
+              @click.prevent.stop="pickerYear = pickerYear - 1"
+              class="px-2 py-1 text-slate-600 hover:bg-slate-100 rounded"
+              title="Tahun sebelumnya"
+            >
+              &laquo;
+            </button>
+            <button
+              type="button"
+              @click.prevent.stop="showYearPicker = !showYearPicker"
+              class="text-sm font-bold text-slate-700 hover:text-blue-700"
+              x-text="pickerYear"
+            ></button>
+            <button
+              type="button"
+              @click.prevent.stop="pickerYear = pickerYear + 1"
+              class="px-2 py-1 text-slate-600 hover:bg-slate-100 rounded"
+              title="Tahun berikutnya"
+            >
+              &raquo;
+            </button>
+          </div>
+
+          <template x-if="!showYearPicker">
+            <div class="grid grid-cols-3 gap-2">
+              <template x-for="opt in monthOptions" :key="opt.value">
+                <button
+                  type="button"
+                  @click.prevent.stop="selectPeriodFromPicker(pickerYear, opt.value)"
+                  class="px-2 py-2 rounded-lg border text-sm font-medium transition"
+                  :class="(selectedYear === String(pickerYear) && selectedMonthNumber === opt.value)
+                    ? 'bg-blue-600 border-blue-600 text-white'
+                    : 'border-slate-200 text-slate-700 hover:bg-slate-50'"
+                  x-text="opt.label"
+                ></button>
+              </template>
+            </div>
+          </template>
+
+          <template x-if="showYearPicker">
+            <div>
+              <div class="grid grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-1">
+                <template x-for="year in yearOptions" :key="'year-' + year">
+                  <button
+                    type="button"
+                    @click.prevent.stop="pickerYear = year; selectedYear = String(year); showYearPicker = false"
+                    class="px-2 py-2 rounded-lg border text-sm font-medium transition"
+                    :class="selectedYear === String(year)
+                      ? 'bg-blue-600 border-blue-600 text-white'
+                      : 'border-slate-200 text-slate-700 hover:bg-slate-50'"
+                    x-text="year"
+                  ></button>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
       </div>
       <a
         href="/transaction/piutang"
@@ -56,9 +135,7 @@
       class="w-full px-6 py-4 border-b border-slate-100 flex items-center justify-between text-left hover:bg-slate-50 transition"
     >
       <div>
-        <h3 class="font-semibold text-slate-700">
-          Ringkasan Rekap (Collapsible)
-        </h3>
+        <h3 class="font-semibold text-slate-700">Ringkasan Rekap</h3>
         <p class="text-xs text-slate-400 mt-1">
           Default tertutup. Klik untuk menampilkan ringkasan.
         </p>
@@ -208,140 +285,8 @@
       ></span>
     </div>
 
-    <div class="p-6 space-y-6">
-      <template x-if="loadingGrouped">
-        <div class="flex items-center justify-center py-10 text-slate-500">
-          <i class="fas fa-spinner fa-spin mr-2"></i> Memuat data
-          pengelompokan...
-        </div>
-      </template>
-
-      <template x-if="!loadingGrouped && groups.length === 0">
-        <div class="text-center py-10 text-slate-500">
-          Tidak ada data pada bulan yang dipilih.
-        </div>
-      </template>
-
-      <template x-for="(g, idx) in groups" :key="idx">
-        <div class="border border-slate-200 rounded-xl overflow-hidden">
-          <div
-            class="bg-cyan-100 px-4 py-2 font-semibold text-slate-700"
-            x-text="g.tanggal_label"
-          ></div>
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm border-collapse rekap-group-table">
-              <thead>
-                <tr>
-                  <th
-                    rowspan="2"
-                    class="border border-slate-300 px-2 py-2 text-center"
-                  >
-                    TANGGAL
-                  </th>
-                  <th
-                    rowspan="2"
-                    class="border border-slate-300 px-2 py-2 text-center"
-                  >
-                    NO
-                  </th>
-                  <th
-                    colspan="2"
-                    class="border border-slate-300 px-2 py-2 text-center"
-                  >
-                    DATA PIUTANG
-                  </th>
-                  <th
-                    colspan="3"
-                    class="border border-slate-300 px-2 py-2 text-center border-l-4 border-l-black"
-                  >
-                    DATA PEMBAYARAN PIUTANG
-                  </th>
-                </tr>
-                <tr>
-                  <th class="border border-slate-300 px-2 py-2 text-center">
-                    PELANGGAN
-                  </th>
-                  <th class="border border-slate-300 px-2 py-2 text-center">
-                    TAGIHAN
-                  </th>
-                  <th
-                    class="border border-slate-300 px-2 py-2 text-center border-l-4 border-l-black"
-                  >
-                    PELANGGAN
-                  </th>
-                  <th class="border border-slate-300 px-2 py-2 text-center">
-                    PEMBAYARAN
-                  </th>
-                  <th class="border border-slate-300 px-2 py-2 text-center">
-                    PERIODE PIUTANG
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <template x-for="(r, ridx) in g.rows" :key="ridx">
-                  <tr>
-                    <td
-                      class="border border-slate-300 px-2 py-1"
-                      x-text="ridx === 0 ? g.tanggal_label : ''"
-                    ></td>
-                    <td
-                      class="border border-slate-300 px-2 py-1 text-center"
-                      x-text="r.no"
-                    ></td>
-                    <td
-                      class="border border-slate-300 px-2 py-1"
-                      x-text="r.piutang_pelanggan"
-                    ></td>
-                    <td
-                      class="border border-slate-300 px-2 py-1 text-right"
-                      x-text="formatIDRDecimal(r.piutang_tagihan)"
-                    ></td>
-                    <td
-                      class="border border-slate-300 px-2 py-1 text-center bg-slate-100 border-l-4 border-l-black"
-                      x-text="r.bayar_pelanggan"
-                    ></td>
-                    <td
-                      class="border border-slate-300 px-2 py-1 text-right bg-slate-100"
-                      x-text="formatIDRDecimal(r.bayar_nominal)"
-                    ></td>
-                    <td
-                      class="border border-slate-300 px-2 py-1 text-center bg-slate-100"
-                      x-text="r.bayar_periode_piutang"
-                    ></td>
-                  </tr>
-                </template>
-                <tr class="bg-cyan-100 font-bold text-slate-700">
-                  <td
-                    colspan="3"
-                    class="border border-slate-300 px-2 py-2 text-right"
-                  >
-                    TOTAL PIUTANG :
-                  </td>
-                  <td
-                    class="border border-slate-300 px-2 py-2 text-right"
-                    x-text="formatIDRDecimal(g.total_piutang)"
-                  ></td>
-                  <td
-                    class="border border-slate-300 px-2 py-2 text-right border-l-4 border-l-black"
-                    colspan="1"
-                  >
-                    TOTAL PEMBAYARAN :
-                  </td>
-                  <td
-                    class="border border-slate-300 px-2 py-2 text-right"
-                    x-text="formatIDRDecimal(g.total_pembayaran)"
-                  ></td>
-                  <td class="border border-slate-300 px-2 py-2"></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </template>
-    </div>
-
-    <div class="px-6 py-4 border-t border-slate-200 bg-slate-50">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+    <div class="p-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
         <div class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
           <p
             class="text-xs uppercase tracking-wide text-blue-700 font-semibold"
@@ -366,6 +311,140 @@
             x-text="'Rp ' + formatIDR(grand.grand_total_pembayaran)"
           ></p>
         </div>
+      </div>
+
+      <template x-if="loadingGrouped">
+        <div class="flex items-center justify-center py-10 text-slate-500">
+          <i class="fas fa-spinner fa-spin mr-2"></i> Memuat data
+          pengelompokan...
+        </div>
+      </template>
+
+      <template x-if="!loadingGrouped && groups.length === 0">
+        <div class="text-center py-10 text-slate-500">
+          Tidak ada data pada bulan yang dipilih.
+        </div>
+      </template>
+
+      <div x-show="!loadingGrouped && groups.length > 0" class="space-y-6">
+        <template x-for="(g, idx) in groups" :key="g.tanggal_label + '-' + idx">
+          <div class="border border-slate-200 rounded-xl overflow-hidden">
+            <div
+              class="px-4 py-3 bg-[#BCE2EC] border-b border-slate-300 font-bold text-slate-800"
+              x-text="g.tanggal_label"
+            ></div>
+            <div class="overflow-x-auto">
+              <table
+                class="w-full text-sm border-collapse rekap-group-table border border-slate-300"
+              >
+                <thead>
+                  <tr class="bg-slate-50">
+                    <th
+                      rowspan="2"
+                      class="border border-slate-300 px-3 py-3 text-center text-slate-700 font-bold"
+                    >
+                      NO
+                    </th>
+                    <th
+                      colspan="2"
+                      class="border border-slate-300 px-3 py-3 text-center text-slate-700 font-bold"
+                    >
+                      DATA PIUTANG
+                    </th>
+                    <th
+                      colspan="3"
+                      class="border border-slate-300 px-3 py-3 text-center text-slate-700 font-bold border-l-4 border-l-black"
+                    >
+                      DATA PEMBAYARAN PIUTANG
+                    </th>
+                  </tr>
+                  <tr class="bg-slate-50">
+                    <th
+                      class="border border-slate-300 px-3 py-2 text-center text-slate-700 font-bold"
+                    >
+                      PELANGGAN
+                    </th>
+                    <th
+                      class="border border-slate-300 px-3 py-2 text-center text-slate-700 font-bold"
+                    >
+                      TAGIHAN
+                    </th>
+                    <th
+                      class="border border-slate-300 px-3 py-2 text-center text-slate-700 font-bold border-l-4 border-l-black"
+                    >
+                      PELANGGAN
+                    </th>
+                    <th
+                      class="border border-slate-300 px-3 py-2 text-center text-slate-700 font-bold"
+                    >
+                      PEMBAYARAN
+                    </th>
+                    <th
+                      class="border border-slate-300 px-3 py-2 text-center text-slate-700 font-bold"
+                    >
+                      PERIODE PIUTANG
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="(r, ridx) in g.rows" :key="ridx">
+                    <tr class="hover:bg-slate-50">
+                      <td
+                        class="border border-slate-300 px-3 py-2 text-center"
+                        x-text="r.no"
+                      ></td>
+                      <td
+                        class="border border-slate-300 px-3 py-2 text-slate-700"
+                        x-text="r.piutang_pelanggan"
+                      ></td>
+                      <td
+                        class="border border-slate-300 px-3 py-2 text-right text-slate-800 font-medium"
+                        x-text="formatIDRDecimal(r.piutang_tagihan)"
+                      ></td>
+                      <td
+                        class="border border-slate-300 px-3 py-2 text-center border-l-4 border-l-black"
+                        :class="r.bayar_pelanggan === '-' ? 'bg-[#D1D5DB] text-slate-500 font-medium' : 'text-slate-700'"
+                        x-text="r.bayar_pelanggan"
+                      ></td>
+                      <td
+                        class="border border-slate-300 px-3 py-2 text-right"
+                        :class="r.bayar_pelanggan === '-' ? 'bg-[#D1D5DB] text-slate-500 font-medium' : 'text-slate-800 font-medium'"
+                        x-text="r.bayar_pelanggan === '-' ? '-' : formatIDRDecimal(r.bayar_nominal)"
+                      ></td>
+                      <td
+                        class="border border-slate-300 px-3 py-2 text-center"
+                        :class="r.bayar_pelanggan === '-' ? 'bg-[#D1D5DB] text-slate-500 font-medium' : 'text-slate-700'"
+                        x-text="r.bayar_periode_piutang"
+                      ></td>
+                    </tr>
+                  </template>
+                  <tr class="bg-[#BCE2EC] font-bold text-slate-800">
+                    <td
+                      colspan="2"
+                      class="border border-slate-300 px-3 py-2 text-right"
+                    >
+                      TOTAL PIUTANG :
+                    </td>
+                    <td
+                      class="border border-slate-300 px-3 py-2 text-right"
+                      x-text="formatIDRDecimal(g.total_piutang)"
+                    ></td>
+                    <td
+                      class="border border-slate-300 px-3 py-2 text-right border-l-4 border-l-black"
+                    >
+                      TOTAL PEMBAYARAN :
+                    </td>
+                    <td
+                      class="border border-slate-300 px-3 py-2 text-right"
+                      x-text="formatIDRDecimal(g.total_pembayaran)"
+                    ></td>
+                    <td class="border border-slate-300 px-3 py-2"></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </template>
       </div>
     </div>
   </div>
@@ -433,6 +512,26 @@
           nilai_paid: 0,
         },
         selectedMonth: "",
+        selectedYear: "",
+        selectedMonthNumber: "",
+        showPeriodPicker: false,
+        showYearPicker: false,
+        pickerYear: new Date().getFullYear(),
+        monthOptions: [
+          { value: "01", label: "Januari" },
+          { value: "02", label: "Februari" },
+          { value: "03", label: "Maret" },
+          { value: "04", label: "April" },
+          { value: "05", label: "Mei" },
+          { value: "06", label: "Juni" },
+          { value: "07", label: "Juli" },
+          { value: "08", label: "Agustus" },
+          { value: "09", label: "September" },
+          { value: "10", label: "Oktober" },
+          { value: "11", label: "November" },
+          { value: "12", label: "Desember" },
+        ],
+        yearOptions: [],
         monthLabel: "-",
         showSummaryCard: false,
         loadingGrouped: false,
@@ -442,20 +541,76 @@
 
         init: function () {
           var now = new Date();
+          this.yearOptions = this.generateYearOptions(now.getFullYear());
+          this.selectedYear = String(now.getFullYear());
+          this.selectedMonthNumber = String(now.getMonth() + 1).padStart(
+            2,
+            "0",
+          );
           this.selectedMonth =
-            now.getFullYear() +
-            "-" +
-            String(now.getMonth() + 1).padStart(2, "0");
-          this.monthLabel = this.selectedMonth;
+            this.selectedYear + "-" + this.selectedMonthNumber;
+          this.monthLabel = this.formatMonthLabel(this.selectedMonth);
           this.initTable();
           this.applyMonthFilter();
         },
 
-        applyMonthFilter: function () {
-          this.monthLabel = this.selectedMonth || "-";
-          this.loadSummary();
-          this.loadGrouped();
+        togglePeriodPicker: function () {
+          this.showPeriodPicker = !this.showPeriodPicker;
+          if (this.showPeriodPicker) {
+            this.showYearPicker = false;
+            this.pickerYear =
+              Number(this.selectedYear) || new Date().getFullYear();
+          }
+        },
+
+        closePeriodPicker: function () {
+          this.showPeriodPicker = false;
+          this.showYearPicker = false;
+        },
+
+        selectPeriodFromPicker: function (year, monthNumber) {
+          this.selectedYear = String(year);
+          this.selectedMonthNumber = String(monthNumber).padStart(2, "0");
+          this.selectedMonth =
+            this.selectedYear + "-" + this.selectedMonthNumber;
+          this.applyMonthFilterAsync();
+          this.closePeriodPicker();
+        },
+
+        applyMonthFilterAsync: async function () {
+          this.selectedMonth =
+            String(this.selectedYear || "") +
+            "-" +
+            String(this.selectedMonthNumber || "").padStart(2, "0");
+          this.monthLabel = this.formatMonthLabel(this.selectedMonth);
+
+          await Promise.all([this.loadSummary(), this.loadGrouped()]);
           if (this.dt) this.dt.ajax.reload(null, false);
+        },
+
+        applyMonthFilter: function () {
+          this.applyMonthFilterAsync();
+        },
+
+        generateYearOptions: function (baseYear) {
+          var years = [];
+          for (var y = baseYear + 5; y >= baseYear - 10; y--) {
+            years.push(y);
+          }
+          return years;
+        },
+
+        formatMonthLabel: function (monthValue) {
+          if (!monthValue || monthValue.length !== 7) return "-";
+          var parts = monthValue.split("-");
+          var y = Number(parts[0]);
+          var m = Number(parts[1]);
+          if (!y || !m) return monthValue;
+          var dt = new Date(y, m - 1, 1);
+          return dt.toLocaleDateString("id-ID", {
+            month: "long",
+            year: "numeric",
+          });
         },
 
         loadSummary: async function () {

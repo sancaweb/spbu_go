@@ -65,16 +65,18 @@ type NozzleFormRow struct {
 // ─── Handler struct ───────────────────────────────────────────────────────────
 
 type PenjualanHandler struct {
-	penjualanSvc service.PenjualanService
-	tiangSvc     service.TiangService
-	shiftSvc     service.ShiftService
-	settingSvc   service.SettingService
-	jenisTestSvc service.JenisTestService
-	bbmSvc       service.BBMService
+	penjualanSvc  service.PenjualanService
+	penyusutanSvc service.PenyusutanService
+	tiangSvc      service.TiangService
+	shiftSvc      service.ShiftService
+	settingSvc    service.SettingService
+	jenisTestSvc  service.JenisTestService
+	bbmSvc        service.BBMService
 }
 
 func NewPenjualanHandler(
 	penjualanSvc service.PenjualanService,
+	penyusutanSvc service.PenyusutanService,
 	tiangSvc service.TiangService,
 	shiftSvc service.ShiftService,
 	settingSvc service.SettingService,
@@ -82,12 +84,13 @@ func NewPenjualanHandler(
 	bbmSvc service.BBMService,
 ) *PenjualanHandler {
 	return &PenjualanHandler{
-		penjualanSvc: penjualanSvc,
-		tiangSvc:     tiangSvc,
-		shiftSvc:     shiftSvc,
-		settingSvc:   settingSvc,
-		jenisTestSvc: jenisTestSvc,
-		bbmSvc:       bbmSvc,
+		penjualanSvc:  penjualanSvc,
+		penyusutanSvc: penyusutanSvc,
+		tiangSvc:      tiangSvc,
+		shiftSvc:      shiftSvc,
+		settingSvc:    settingSvc,
+		jenisTestSvc:  jenisTestSvc,
+		bbmSvc:        bbmSvc,
 	}
 }
 
@@ -410,6 +413,13 @@ func (h *PenjualanHandler) Create(c *gin.Context) {
 		log.Printf("[penjualan] Create %d: PostJournal error: %v", p.ID, jErr)
 	}
 
+	// Generate snapshot penyusutan berdasarkan laporan penjualan yang baru disubmit.
+	if h.penyusutanSvc != nil {
+		if psErr := h.penyusutanSvc.GenerateFromPenjualan(p, userID); psErr != nil {
+			log.Printf("[penjualan] Create %d: GeneratePenyusutan error: %v", p.ID, psErr)
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": fmt.Sprintf("Penjualan %s berhasil disimpan", p.NoPenjualan),
@@ -464,6 +474,13 @@ func (h *PenjualanHandler) Update(c *gin.Context) {
 	// Re-post journal (idempotent: reverse lama + post baru)
 	if jErr := h.penjualanSvc.PostJournal(p, userID); jErr != nil {
 		log.Printf("[penjualan] Update %d: PostJournal error: %v", p.ID, jErr)
+	}
+
+	// Refresh snapshot penyusutan saat laporan penjualan diupdate.
+	if h.penyusutanSvc != nil {
+		if psErr := h.penyusutanSvc.GenerateFromPenjualan(p, userID); psErr != nil {
+			log.Printf("[penjualan] Update %d: GeneratePenyusutan error: %v", p.ID, psErr)
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{

@@ -1,0 +1,20 @@
+# Legacy project folder
+/spbu/
+
+# Environment variables
+.env
+
+# Binary outputs
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+tmp/
+
+# IDE / OS specific
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

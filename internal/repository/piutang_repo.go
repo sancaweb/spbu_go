@@ -2,6 +2,7 @@ package repository
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -527,7 +528,7 @@ func (r *piutangRepository) AddDetail(piutangID uint64, detail *entity.TrxPiutan
 		if detail.PenjualanID == 0 {
 			detail.PenjualanID = header.PenjualanID
 		}
-		detail.TotalLine = detail.HargaBBM * detail.QtyLiter
+		detail.TotalLine = int64(math.Round(float64(detail.HargaBBM) * detail.QtyLiter))
 
 		return tx.Omit("Piutang", "Penjualan", "BBM", "Creator", "Updater").Create(detail).Error
 	})
@@ -559,7 +560,7 @@ func (r *piutangRepository) UpdateDetail(piutangID uint64, detailID uint64, deta
 			"harga_bbm":    detail.HargaBBM,
 			"margin":       detail.Margin,
 			"qty_liter":    detail.QtyLiter,
-			"total_line":   detail.HargaBBM * detail.QtyLiter,
+			"total_line":   int64(math.Round(float64(detail.HargaBBM) * detail.QtyLiter)),
 			"updated_by":   detail.UpdatedBy,
 		}
 
@@ -599,19 +600,19 @@ type PiutangDTRow struct {
 }
 
 type PiutangDetailDTRow struct {
-	IDPiutangDetail uint64 `gorm:"column:id_piutang_detail" json:"id_piutang_detail"`
-	IDPiutang       uint64 `gorm:"column:id_piutang" json:"id_piutang"`
-	Tgl             string `gorm:"column:tgl" json:"tgl"`
-	PartnerName     string `gorm:"column:partner_name" json:"partner_name"`
-	NoPenjualan     string `gorm:"column:no_penjualan" json:"no_penjualan"`
-	NoVoucher       string `gorm:"column:no_voucher" json:"no_voucher"`
-	NoPol           string `gorm:"column:no_pol" json:"no_pol"`
-	DriverName      string `gorm:"column:driver_name" json:"driver_name"`
-	BBMName         string `gorm:"column:bbm_name" json:"bbm_name"`
-	HargaBBM        int64  `gorm:"column:harga_bbm" json:"harga_bbm"`
-	QtyLiter        int64  `gorm:"column:qty_liter" json:"qty_liter"`
-	TotalLine       int64  `gorm:"column:total_line" json:"total_line"`
-	Status          string `gorm:"column:status" json:"status"`
+	IDPiutangDetail uint64  `gorm:"column:id_piutang_detail" json:"id_piutang_detail"`
+	IDPiutang       uint64  `gorm:"column:id_piutang" json:"id_piutang"`
+	Tgl             string  `gorm:"column:tgl" json:"tgl"`
+	PartnerName     string  `gorm:"column:partner_name" json:"partner_name"`
+	NoPenjualan     string  `gorm:"column:no_penjualan" json:"no_penjualan"`
+	NoVoucher       string  `gorm:"column:no_voucher" json:"no_voucher"`
+	NoPol           string  `gorm:"column:no_pol" json:"no_pol"`
+	DriverName      string  `gorm:"column:driver_name" json:"driver_name"`
+	BBMName         string  `gorm:"column:bbm_name" json:"bbm_name"`
+	HargaBBM        int64   `gorm:"column:harga_bbm" json:"harga_bbm"`
+	QtyLiter        float64 `gorm:"column:qty_liter" json:"qty_liter"`
+	TotalLine       int64   `gorm:"column:total_line" json:"total_line"`
+	Status          string  `gorm:"column:status" json:"status"`
 }
 
 type PiutangRekapDTRow struct {

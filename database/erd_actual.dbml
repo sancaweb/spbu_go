@@ -1,0 +1,468 @@
+// Generated from PostgreSQL database spbu_go on 2026-09-19
+// Physical duplicate foreign keys are collapsed to one logical Ref per column pair.
+Project spbu_go {
+  database_type: 'PostgreSQL'
+}
+
+Table bbm {
+  id int [not null, pk]
+  name varchar [not null]
+  margin decimal [not null]
+  price decimal [not null]
+  stock bigint [not null]
+  reward_percent decimal [not null]
+  is_active boolean
+  created_at timestamp
+  updated_at timestamp
+  updated_by bigint
+  deleted_at timestamp
+}
+
+Table coa_mappings {
+  id int [not null, pk]
+  trans_type varchar [not null]
+  role varchar [not null]
+  label varchar [not null]
+  coa_id bigint [not null]
+  bbm_id bigint
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table coa_types {
+  id int [not null, pk]
+  code varchar [not null]
+  name varchar [not null]
+  normal_balance varchar [not null]
+  description text
+  is_active boolean
+  created_at timestamp
+  updated_at timestamp
+  deleted_at timestamp
+}
+
+Table coas {
+  id int [not null, pk]
+  coa_type_id bigint [not null]
+  code varchar [not null]
+  name varchar [not null]
+  description text
+  is_header boolean
+  is_system boolean
+  is_active boolean
+  created_at timestamp
+  updated_at timestamp
+  updated_by bigint
+  deleted_at timestamp
+}
+
+Table jabatan {
+  id int [not null, pk]
+  kode_jabatan varchar [not null, unique]
+  nama_jabatan varchar [not null]
+  reward_persen decimal
+  created_at timestamp
+  updated_at timestamp
+  deleted_at timestamp
+  is_active boolean
+}
+
+Table jenis_test {
+  id int [not null, pk]
+  nama_test varchar [not null]
+  deskripsi text
+  is_active boolean
+  created_at timestamp
+  updated_at timestamp
+  deleted_at timestamp
+}
+
+Table journal_entries {
+  id bigint [not null, pk]
+  coa_id bigint [not null]
+  wallet_id bigint
+  debit bigint [not null]
+  credit bigint [not null]
+  description varchar
+  ref_type varchar
+  ref_id bigint
+  trans_date timestamp [not null]
+  created_at timestamp
+  created_by bigint
+}
+
+Table karyawan {
+  id int [not null, pk]
+  nik varchar [not null, unique]
+  nama_lengkap varchar [not null]
+  gaji_pokok bigint
+  alamat text
+  tempat_lahir varchar
+  tanggal_lahir date
+  status_nikah varchar
+  jumlah_anak int
+  jabatan_id bigint
+  jenis_kelamin varchar
+  agama varchar
+  no_hp varchar
+  pendidikan varchar
+  tgl_pengangkatan date
+  tgl_keluar date
+  foto varchar
+  is_active boolean
+  created_at timestamp
+  updated_at timestamp
+  updated_by bigint
+  deleted_at timestamp
+}
+
+Table karyawan_pendapatan {
+  karyawan_id int [not null, pk]
+  pendapatan_id int [not null, pk]
+}
+
+Table karyawan_potongan {
+  karyawan_id int [not null, pk]
+  potongan_id int [not null, pk]
+}
+
+Table nozzles {
+  id int [not null, pk]
+  tiang_id bigint [not null]
+  description varchar
+  bbm_id bigint [not null]
+  is_active boolean
+  created_at timestamp
+  updated_at timestamp
+  updated_by bigint
+  deleted_at timestamp
+}
+
+Table partners {
+  id int [not null, pk]
+  name varchar [not null]
+  contact_person varchar
+  phone varchar
+  address text
+  is_active boolean
+  created_at timestamp
+  updated_at timestamp
+  updated_by bigint
+  deleted_at timestamp
+}
+
+Table pendapatan {
+  id int [not null, pk]
+  nama_pendapatan varchar [not null]
+  tipe varchar [not null]
+  nilai bigint
+  deskripsi text
+  is_active boolean
+  created_at timestamp
+  updated_at timestamp
+  updated_by bigint
+  deleted_at timestamp
+}
+
+Table permissions {
+  id bigint [not null, pk]
+  name text [not null]
+  code text [not null, unique]
+  created_at timestamptz
+  updated_at timestamptz
+  deleted_at timestamptz
+}
+
+Table potongan {
+  id int [not null, pk]
+  kode_potongan varchar [not null]
+  nama_potongan varchar [not null]
+  tipe varchar [not null]
+  nilai bigint
+  deskripsi text
+  is_active boolean
+  created_at timestamp
+  updated_at timestamp
+  updated_by bigint
+  deleted_at timestamp
+}
+
+Table role_permissions {
+  role_id bigint [not null, pk]
+  permission_id bigint [not null, pk]
+}
+
+Table roles {
+  id bigint [not null, pk]
+  name text [not null]
+  code text [not null, unique]
+  created_at timestamptz
+  updated_at timestamptz
+  deleted_at timestamptz
+}
+
+Table settings {
+  id int [not null, pk]
+  setting_name varchar [not null, unique]
+  setting_value varchar [not null]
+  created_at timestamp
+  updated_at timestamp
+  deleted_at timestamp
+}
+
+Table shifts {
+  id int [not null, pk]
+  shift_name varchar [not null]
+  shift_time varchar
+  created_at timestamp
+  updated_at timestamp
+  is_cross_day boolean
+}
+
+Table tiang {
+  id int [not null, pk]
+  name varchar [not null]
+  slug varchar [not null, unique]
+  created_at timestamp
+  updated_at timestamp
+  updated_by bigint
+  deleted_at timestamp
+}
+
+Table trx_kedatangan_bbm {
+  id_kedatangan_bbm bigint [not null, pk]
+  penebusan_id bigint [not null]
+  penebusan_detail_id bigint [not null]
+  no_lo varchar [not null]
+  tgl_kedatangan timestamp [not null]
+  shift_id bigint [not null]
+  bbm_id bigint [not null]
+  jml_liter bigint [not null]
+  nama_driver varchar
+  no_pol varchar
+  created timestamp
+  updated timestamp
+  created_by bigint
+  updated_by bigint
+}
+
+Table trx_penebusan {
+  id bigint [not null, pk]
+  no_penebusan varchar [not null]
+  no_so varchar
+  tgl_penebusan date [not null]
+  tgl_bayar date
+  wallet_id bigint
+  adm_bank bigint [not null]
+  status varchar [not null]
+  catatan text
+  subtotal bigint [not null]
+  total_ppn bigint [not null]
+  total_bayar bigint [not null]
+  created_at timestamp
+  updated_at timestamp
+  updated_by bigint
+  deleted_at timestamp
+}
+
+Table trx_penebusan_detail {
+  id bigint [not null, pk]
+  penebusan_id bigint [not null]
+  bbm_id bigint [not null]
+  jml_liter bigint [not null]
+  harga_dasar bigint [not null]
+  harga_jual bigint [not null]
+  margin bigint [not null]
+  ppn_persen decimal [not null]
+  ppn_rp bigint [not null]
+  subtotal bigint [not null]
+  total bigint [not null]
+  created_at timestamp
+  updated_at timestamp
+  qty_terkirim bigint [not null]
+}
+
+Table trx_penjualan {
+  id_penjualan bigint [not null, pk]
+  no_penjualan varchar [not null]
+  shift_id bigint [not null]
+  waktu_mulai timestamp [not null]
+  waktu_akhir timestamp [not null]
+  total_rp_totalisator bigint [not null]
+  total_penerimaan bigint [not null]
+  aktual_uang bigint [not null]
+  selisih bigint [not null]
+  created timestamp
+  created_by bigint
+  updated timestamp
+  updated_by bigint
+}
+
+Table trx_penjualan_detail {
+  detail_penjualan_id bigint [not null, pk]
+  penjualan_id bigint [not null]
+  tiang_id bigint [not null]
+  nozzle_id bigint [not null]
+  bbm_id bigint [not null]
+  bbm_price bigint [not null]
+  margin bigint [not null]
+  totalisator_awal bigint [not null]
+  totalisator_akhir bigint [not null]
+  jml_liter bigint [not null]
+  jml_rupiah bigint [not null]
+}
+
+Table trx_penjualan_pengeluaran_test {
+  id bigint [not null, pk]
+  penjualan_id bigint [not null]
+  jenis_test_id bigint [not null]
+  bbm_id bigint [not null]
+  qty_liter bigint [not null]
+  total_rupiah bigint [not null]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table trx_penyusutan {
+  id_penyusutan bigint [not null, pk]
+  no_penyusutan varchar [not null]
+  tgl_penyusutan date [not null]
+  shift_id bigint [not null]
+  bbm_id bigint [not null]
+  jml_liter bigint [not null]
+  harga_dasar bigint [not null]
+  nilai_rupiah bigint [not null]
+  keterangan text
+  created timestamp
+  created_by bigint
+  updated timestamp
+  updated_by bigint
+  penjualan_id bigint
+  no_form varchar [not null]
+  waktu timestamp
+  first_stock decimal [not null]
+  endstock_actual decimal [not null]
+  endstock_booked decimal [not null]
+
+  indexes {
+    (penjualan_id, bbm_id) [unique]
+  }
+}
+
+Table trx_piutang {
+  id_piutang bigint [not null, pk]
+  penjualan_id bigint [not null]
+  pelanggan_id bigint [not null]
+  total_tagihan bigint [not null]
+  status varchar [not null]
+  isinvoiced boolean
+  created timestamp
+  created_by bigint
+  updated timestamp
+  updated_by bigint
+}
+
+Table trx_piutang_detail {
+  id_piutang_detail bigint [not null, pk]
+  piutang_id bigint [not null]
+  penjualan_id bigint [not null]
+  no_voucher varchar
+  no_pol varchar
+  driver_name varchar
+  bbm_id bigint [not null]
+  harga_bbm bigint [not null]
+  margin bigint [not null]
+  qty_liter bigint [not null]
+  total_line bigint [not null]
+  created timestamp
+  created_by bigint
+  updated timestamp
+  updated_by bigint
+}
+
+Table users {
+  id bigint [not null, pk]
+  first_name varchar
+  username text [not null, unique]
+  password text [not null]
+  role_id bigint [not null]
+  created_at timestamptz
+  updated_at timestamptz
+  deleted_at timestamptz
+  last_name varchar
+  email varchar
+  phone varchar
+  active boolean
+}
+
+Table wallets {
+  id bigint [not null, pk]
+  wallet_name varchar [not null]
+  is_default boolean
+  description varchar
+  saldo bigint
+  created_at timestamptz
+  updated_at timestamptz
+  updated_by bigint
+  deleted_at timestamptz
+}
+
+Ref: bbm.updated_by > users.id
+Ref: coa_mappings.bbm_id > bbm.id
+Ref: coa_mappings.coa_id > coas.id
+Ref: coas.coa_type_id > coa_types.id
+Ref: coas.updated_by > users.id
+Ref: journal_entries.coa_id > coas.id
+Ref: journal_entries.created_by > users.id
+Ref: journal_entries.wallet_id > wallets.id
+Ref: karyawan.jabatan_id > jabatan.id
+Ref: karyawan.updated_by > users.id
+Ref: karyawan_pendapatan.karyawan_id > karyawan.id
+Ref: karyawan_pendapatan.pendapatan_id > pendapatan.id
+Ref: karyawan_potongan.karyawan_id > karyawan.id
+Ref: karyawan_potongan.potongan_id > potongan.id
+Ref: nozzles.bbm_id > bbm.id
+Ref: nozzles.tiang_id > tiang.id
+Ref: nozzles.updated_by > users.id
+Ref: partners.updated_by > users.id
+Ref: pendapatan.updated_by > users.id
+Ref: potongan.updated_by > users.id
+Ref: role_permissions.permission_id > permissions.id
+Ref: role_permissions.role_id > roles.id
+Ref: tiang.updated_by > users.id
+Ref: trx_kedatangan_bbm.bbm_id > bbm.id
+Ref: trx_kedatangan_bbm.created_by > users.id
+Ref: trx_kedatangan_bbm.penebusan_detail_id > trx_penebusan_detail.id
+Ref: trx_kedatangan_bbm.penebusan_id > trx_penebusan.id
+Ref: trx_kedatangan_bbm.shift_id > shifts.id
+Ref: trx_kedatangan_bbm.updated_by > users.id
+Ref: trx_penebusan.updated_by > users.id
+Ref: trx_penebusan.wallet_id > wallets.id
+Ref: trx_penebusan_detail.bbm_id > bbm.id
+Ref: trx_penebusan_detail.penebusan_id > trx_penebusan.id
+Ref: trx_penjualan.created_by > users.id
+Ref: trx_penjualan.shift_id > shifts.id
+Ref: trx_penjualan.updated_by > users.id
+Ref: trx_penjualan_detail.bbm_id > bbm.id
+Ref: trx_penjualan_detail.nozzle_id > nozzles.id
+Ref: trx_penjualan_detail.penjualan_id > trx_penjualan.id_penjualan
+Ref: trx_penjualan_detail.tiang_id > tiang.id
+Ref: trx_penjualan_pengeluaran_test.bbm_id > bbm.id
+Ref: trx_penjualan_pengeluaran_test.jenis_test_id > jenis_test.id
+Ref: trx_penjualan_pengeluaran_test.penjualan_id > trx_penjualan.id_penjualan
+Ref: trx_penyusutan.bbm_id > bbm.id
+Ref: trx_penyusutan.created_by > users.id
+Ref: trx_penyusutan.penjualan_id > trx_penjualan.id_penjualan
+Ref: trx_penyusutan.shift_id > shifts.id
+Ref: trx_penyusutan.updated_by > users.id
+Ref: trx_piutang.created_by > users.id
+Ref: trx_piutang.pelanggan_id > partners.id
+Ref: trx_piutang.penjualan_id > trx_penjualan.id_penjualan
+Ref: trx_piutang.updated_by > users.id
+Ref: trx_piutang_detail.bbm_id > bbm.id
+Ref: trx_piutang_detail.created_by > users.id
+Ref: trx_piutang_detail.penjualan_id > trx_penjualan.id_penjualan
+Ref: trx_piutang_detail.piutang_id > trx_piutang.id_piutang
+Ref: trx_piutang_detail.updated_by > users.id
+Ref: users.role_id > roles.id
+Ref: wallets.updated_by > users.id

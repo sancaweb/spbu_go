@@ -3,6 +3,7 @@
 
 # Environment variables
 .env
+/config/.env
 
 # Binary outputs
 *.exe
@@ -12,9 +13,16 @@
 *.dylib
 bin/
 tmp/
+.gocache/
+
+# Local development artifacts
+*.log
+run_log.txt
+.tmp_*
 
 # IDE / OS specific
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
+node_modules

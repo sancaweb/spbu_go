@@ -258,6 +258,12 @@
           <span class="px-2.5 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-full">
             {{ $shiftGroup.ShiftName }}
           </span>
+          {{ if $shiftGroup.IsCrossDay }}
+          <span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-semibold rounded-full flex items-center gap-1">
+            <svg class="w-3 h-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Lintas Hari
+          </span>
+          {{ end }}
           <span class="text-sm font-semibold text-slate-700">
             No. Form: <span class="font-mono text-slate-500">{{ $shiftGroup.NoForm }}</span>
           </span>
@@ -310,20 +316,19 @@
                   <tr class="hover:bg-slate-50">
                     {{ if eq $nozzleIdx 0 }}
                     <td rowspan="{{ $countNozle }}" class="border border-slate-200 px-3 py-2 text-center align-middle whitespace-nowrap">
-                      {{ if $bbmGroup.PenyusutanID }}
-                      <button
-                        type="button"
-                        @click="openEditModal({{ $bbmGroup.PenyusutanID }}, '{{ $bbmGroup.JenisBBM }}', {{ $bbmGroup.StokAkhirAktual }})"
-                        class="flex items-center justify-center p-1.5 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-[#005596] hover:text-blue-900 rounded-lg transition shadow-sm mx-auto focus:outline-none"
-                        title="Input stok akhir aktual (penghitungan fisik tangki)"
+                      {{ if $bbmGroup.EditToken }}
+                      <a
+                        href="/transaction/penyusutan/view_edit/{{ $bbmGroup.EditToken }}"
+                        class="inline-flex items-center justify-center p-1.5 bg-red-50 border border-red-200 hover:bg-red-100 text-red-700 hover:text-red-900 rounded-lg transition shadow-sm mx-auto focus:outline-none"
+                        title="Edit Parameter Penyusutan (Shift & BBM)"
                       >
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                         </svg>
-                      </button>
+                      </a>
                       {{ else }}
-                      -
+                      <span class="text-slate-300">-</span>
                       {{ end }}
                     </td>
                     <td rowspan="{{ $countNozle }}" class="border border-slate-200 px-3 py-2 whitespace-nowrap align-middle">{{ $shiftGroup.WaktuMulai }}</td>

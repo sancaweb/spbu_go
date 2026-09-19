@@ -29,3 +29,8 @@ type SettingRepository interface {
 	FindAll() ([]entity.Setting, error)
 	Upsert(key, value string) error
 }
+
+type LegacyDBConnectionRepository interface {
+	Find() (*entity.LegacyDBConnection, error)
+	Save(connection *entity.LegacyDBConnection) error
+}

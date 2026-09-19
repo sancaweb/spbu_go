@@ -1,10 +1,13 @@
 package handler
 
 import (
+	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"spbu_go/internal/dto"
 	"spbu_go/internal/entity"
@@ -13,6 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
+	"gorm.io/gorm"
 )
 
 type PartnerHandler struct {
@@ -84,9 +88,13 @@ func (h *PartnerHandler) Archive(c *gin.Context) {
 
 // Create new partner
 func (h *PartnerHandler) Create(c *gin.Context) {
-	var partner entity.Partner
+	partner := entity.Partner{IsActive: true}
 	if err := c.ShouldBind(&partner); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"status": false, "message": "Input tidak valid"})
+		return
+	}
+	if err := bindPartnerAgreementFields(c, &partner); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": false, "message": err.Error()})
 		return
 	}
 
@@ -136,6 +144,10 @@ func (h *PartnerHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"status": false, "message": "Input tidak valid"})
 		return
 	}
+	if err := bindPartnerAgreementFields(c, &partner); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"status": false, "message": err.Error()})
+		return
+	}
 
 	// Apply Formatting Rules
 	caser := cases.Title(language.Indonesian)
@@ -182,6 +194,29 @@ func (h *PartnerHandler) Delete(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": true, "message": "Partner berhasil dinonaktifkan"})
 }
 
+func (h *PartnerHandler) DeletePermanent(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"status": false, "message": "ID tidak valid"})
+		return
+	}
+
+	if err := h.partnerService.DeletePermanent(uint(id)); err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"status": false, "message": "Partner tidak ditemukan"})
+		case errors.Is(err, entity.ErrPartnerNotArchived), errors.Is(err, entity.ErrPartnerHasPiutang), errors.Is(err, entity.ErrPartnerReferenced):
+			c.JSON(http.StatusConflict, gin.H{"status": false, "message": err.Error()})
+		default:
+			log.Printf("Error permanently deleting partner %d: %v", id, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"status": false, "message": "Gagal menghapus partner secara permanen"})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": true, "message": "Partner berhasil dihapus permanen"})
+}
+
 // Restore Soft Deleted Partner
 func (h *PartnerHandler) Restore(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
@@ -197,4 +232,73 @@ func (h *PartnerHandler) Restore(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": true, "message": "Partner berhasil diaktifkan kembali"})
+}
+
+const partnerDateFormat = "2006-01-02"
+
+func bindPartnerAgreementFields(c *gin.Context, partner *entity.Partner) error {
+	if value, exists := c.GetPostForm("start_date"); exists {
+		date, err := parsePartnerDate(value)
+		if err != nil {
+			return fmt.Errorf("Start Date harus berformat YYYY-MM-DD")
+		}
+		partner.StartDate = date
+	}
+
+	if value, exists := c.GetPostForm("end_date"); exists {
+		date, err := parsePartnerDate(value)
+		if err != nil {
+			return fmt.Errorf("End Date harus berformat YYYY-MM-DD")
+		}
+		partner.EndDate = date
+	}
+
+	if value, exists := c.GetPostForm("isactive"); exists {
+		isActive, err := parsePartnerBoolean(value)
+		if err != nil {
+			return fmt.Errorf("Status partner tidak valid")
+		}
+		partner.IsActive = isActive
+	}
+
+	if value, exists := c.GetPostForm("auto_off"); exists {
+		autoOff, err := parsePartnerBoolean(value)
+		if err != nil {
+			return fmt.Errorf("Auto off tidak valid")
+		}
+		partner.AutoOff = autoOff
+	}
+
+	if partner.StartDate != nil && partner.EndDate != nil && partner.EndDate.Before(*partner.StartDate) {
+		return fmt.Errorf("End Date tidak boleh lebih awal dari Start Date")
+	}
+	if partner.AutoOff && partner.EndDate == nil {
+		return fmt.Errorf("End Date wajib diisi jika Auto off diaktifkan")
+	}
+
+	return nil
+}
+
+func parsePartnerDate(value string) (*time.Time, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil, nil
+	}
+
+	parsed, err := time.ParseInLocation(partnerDateFormat, value, time.UTC)
+	if err != nil {
+		return nil, err
+	}
+	return &parsed, nil
+}
+
+func parsePartnerBoolean(value string) (bool, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "true", "1", "on", "yes":
+		return true, nil
+	case "false", "0", "off", "no":
+		return false, nil
+	default:
+		return false, fmt.Errorf("nilai boolean tidak dikenal")
+	}
 }

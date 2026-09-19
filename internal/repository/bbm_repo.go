@@ -25,7 +25,7 @@ func NewBBMRepository(db *gorm.DB) BBMRepository {
 
 func (r *bbmRepository) FindAll() ([]entity.BBM, error) {
 	var bbms []entity.BBM
-	err := r.db.Preload("Updater").Find(&bbms).Error
+	err := r.db.Preload("Updater").Order("LOWER(name) ASC").Order("name ASC").Find(&bbms).Error
 	return bbms, err
 }
 

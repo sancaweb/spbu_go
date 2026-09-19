@@ -16,11 +16,12 @@ type PenjualanRepository interface {
 	FindByID(id uint64) (*entity.TrxPenjualan, error)
 	Datatable(req dto.DatatableRequest) (int64, int64, []dto.PenjualanDTRow, error)
 	Create(p *entity.TrxPenjualan) error
+	CreateWithPiutangs(p *entity.TrxPenjualan, piutangs []entity.TrxPiutang) error
 	Update(p *entity.TrxPenjualan) error
 	Delete(id uint64) error
 	// GetLastTotalisatorByNozzle mengembalikan map nozzle_id → totalisator_akhir terakhir.
 	// Dipakai untuk auto-fill Totalisator Awal di form create penjualan baru.
-	GetLastTotalisatorByNozzle() (map[uint]int64, error)
+	GetLastTotalisatorByNozzle() (map[uint]float64, error)
 }
 
 type penjualanRepository struct {
@@ -178,6 +179,12 @@ func (r *penjualanRepository) Datatable(req dto.DatatableRequest) (int64, int64,
 }
 
 func (r *penjualanRepository) Create(p *entity.TrxPenjualan) error {
+	return r.CreateWithPiutangs(p, nil)
+}
+
+// CreateWithPiutangs menyimpan penjualan, detail nozzle, pengeluaran test,
+// dan header piutang B2B dalam satu transaksi database.
+func (r *penjualanRepository) CreateWithPiutangs(p *entity.TrxPenjualan, piutangs []entity.TrxPiutang) error {
 	// Generate nomor dokumen
 	p.NoPenjualan = r.nextNoPenjualan(p)
 
@@ -209,6 +216,21 @@ func (r *penjualanRepository) Create(p *entity.TrxPenjualan) error {
 	}
 	if len(p.PengeluaranTests) > 0 {
 		if err := tx.Omit("JenisTest", "BBM").Create(&p.PengeluaranTests).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	// Piutang dari form penjualan hanya membuat header. Detail voucher dapat
+	// ditambahkan kemudian melalui modul piutang jika memang diperlukan.
+	for i := range piutangs {
+		piutangs[i].PenjualanID = p.ID
+		piutangs[i].Status = entity.PiutangUnpaid
+		piutangs[i].CreatedBy = p.CreatedBy
+		piutangs[i].UpdatedBy = p.UpdatedBy
+	}
+	if len(piutangs) > 0 {
+		if err := tx.Omit("Partner", "Penjualan", "Creator", "Updater", "Details").Create(&piutangs).Error; err != nil {
 			tx.Rollback()
 			return err
 		}
@@ -271,13 +293,13 @@ func (r *penjualanRepository) Delete(id uint64) error {
 
 // nozzleLastTot — row helper untuk GetLastTotalisatorByNozzle.
 type nozzleLastTot struct {
-	NozzleID         uint  `gorm:"column:nozzle_id"`
-	TotalisatorAkhir int64 `gorm:"column:totalisator_akhir"`
+	NozzleID         uint    `gorm:"column:nozzle_id"`
+	TotalisatorAkhir float64 `gorm:"column:totalisator_akhir"`
 }
 
 // GetLastTotalisatorByNozzle mengembalikan map nozzle_id → totalisator_akhir terakhir
 // berdasarkan waktu_akhir transaksi penjualan.
-func (r *penjualanRepository) GetLastTotalisatorByNozzle() (map[uint]int64, error) {
+func (r *penjualanRepository) GetLastTotalisatorByNozzle() (map[uint]float64, error) {
 	var rows []nozzleLastTot
 	err := r.db.Raw(`
 		SELECT DISTINCT ON (d.nozzle_id)
@@ -290,7 +312,7 @@ func (r *penjualanRepository) GetLastTotalisatorByNozzle() (map[uint]int64, erro
 	if err != nil {
 		return nil, err
 	}
-	result := make(map[uint]int64, len(rows))
+	result := make(map[uint]float64, len(rows))
 	for _, row := range rows {
 		result[row.NozzleID] = row.TotalisatorAkhir
 	}

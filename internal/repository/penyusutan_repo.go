@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"spbu_go/internal/entity"
+	"spbu_go/internal/helper"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -36,7 +37,7 @@ type PenyusutanReportGroup struct {
 	BBMID              uint                  `json:"bbm_id"`
 	JenisBBM           string                `json:"jenis_bbm"`
 	Rows               []PenyusutanReportRow `json:"rows"`
-	FirstStock         float64               `json:"first_stock"`        // stok awal (dari record pertama hari/bulan itu)
+	FirstStock         float64               `json:"first_stock"` // stok awal (dari record pertama hari/bulan itu)
 	TotalPenerimaan    float64               `json:"total_penerimaan"`
 	TotalPenjualan     float64               `json:"total_penjualan"`
 	DensityTera        float64               `json:"density_tera"`
@@ -63,6 +64,7 @@ type PenyusutanShiftBBM struct {
 	BBMID            uint                    `json:"bbm_id"`
 	JenisBBM         string                  `json:"jenis_bbm"`
 	PenyusutanID     uint64                  `json:"penyusutan_id"` // untuk tombol Edit Stok Aktual
+	EditToken        string                  `json:"edit_token"`    // Token URL terenkripsi (bbmID:shiftID:penjualanID)
 	StokAwal         float64                 `json:"stok_awal"`
 	TotalPenerimaan  float64                 `json:"total_penerimaan"`
 	Nozzles          []PenyusutanShiftNozzle `json:"nozzles"`
@@ -75,11 +77,39 @@ type PenyusutanShiftBBM struct {
 	Persentasi       float64                 `json:"persentasi"`
 }
 
+// PenyusutanEditData DTO untuk rincian data halaman form edit penyusutan.
+type PenyusutanEditData struct {
+	PenyusutanID     uint64                  `json:"penyusutan_id"`
+	PenjualanID      uint64                  `json:"penjualan_id"`
+	NoForm           string                  `json:"no_form"`
+	ShiftID          uint                    `json:"shift_id"`
+	ShiftName        string                  `json:"shift_name"`
+	WaktuDate        string                  `json:"waktu_date"`  // YYYY-MM-DD
+	WaktuLabel       string                  `json:"waktu_label"` // DD Mon YYYY
+	WaktuMulai       string                  `json:"waktu_mulai"`
+	WaktuAkhir       string                  `json:"waktu_akhir"`
+	BBMID            uint                    `json:"bbm_id"`
+	NamaBBM          string                  `json:"nama_bbm"`
+	StokAwal         float64                 `json:"stok_awal"`
+	TotalPenerimaan  float64                 `json:"total_penerimaan"`
+	Nozzles          []PenyusutanShiftNozzle `json:"nozzles"`
+	TotalPenjualan   float64                 `json:"total_penjualan"`
+	DensityTera      float64                 `json:"density_tera"`
+	PenjualanMinTera float64                 `json:"penjualan_min_tera"`
+	StokAkhirAktual  float64                 `json:"stok_akhir_aktual"`
+	StokAkhirCatatan float64                 `json:"stok_akhir_catatan"`
+	Penyusutan       float64                 `json:"penyusutan"`
+	Persentasi       float64                 `json:"persentasi"`
+	EditToken        string                  `json:"edit_token"`
+}
+
 // PenyusutanShiftGroup adalah satu shift / satu penjualan.
 type PenyusutanShiftGroup struct {
 	PenjualanID uint64               `json:"penjualan_id"`
 	NoForm      string               `json:"no_form"`
+	ShiftID     uint                 `json:"shift_id"`
 	ShiftName   string               `json:"shift_name"`
+	IsCrossDay  bool                 `json:"is_cross_day"`
 	WaktuMulai  string               `json:"waktu_mulai"`
 	WaktuAkhir  string               `json:"waktu_akhir"`
 	BBMGroups   []PenyusutanShiftBBM `json:"bbm_groups"`
@@ -91,6 +121,8 @@ type PenyusutanRepository interface {
 	UpsertFromPenjualan(p *entity.TrxPenjualan, actorID *uint) error
 	GetReport(filter PenyusutanReportFilter) ([]PenyusutanReportGroup, error)
 	GetShiftReport(date string) ([]PenyusutanShiftGroup, error)
+	GetEditData(bbmID uint, shiftID uint, penjualanID uint64) (*PenyusutanEditData, error)
+	SaveEditData(penjualanID uint64, bbmID uint, shiftID uint, stokAwal float64, stokAktual float64, updatedBy *uint) error
 	UpdateEndstockActual(id uint64, actual float64, updatedBy *uint) error
 }
 
@@ -100,6 +132,13 @@ type penyusutanRepository struct {
 
 func NewPenyusutanRepository(db *gorm.DB) PenyusutanRepository {
 	return &penyusutanRepository{db: db}
+}
+
+// calculateEndstockBooked centralizes the stock-booking formula used by the
+// transaction snapshot and keeps fractional liter values intact.
+func calculateEndstockBooked(firstStock, totalPenerimaan, totalPenjualan, densityTera float64) float64 {
+	netSales := totalPenjualan - densityTera
+	return firstStock + totalPenerimaan - netSales
 }
 
 // ─── UpsertFromPenjualan ─────────────────────────────────────────────────────
@@ -164,8 +203,7 @@ func (r *penyusutanRepository) UpsertFromPenjualan(p *entity.TrxPenjualan, actor
 			tx.Raw(`SELECT COALESCE(stock, 0) FROM bbm WHERE id = ? LIMIT 1`, bbmID).Scan(&firstStock)
 		}
 
-		netSales := totalPenjualan - densityTera
-		endBooked := firstStock + totalPenerimaan - netSales
+		endBooked := calculateEndstockBooked(firstStock, totalPenerimaan, totalPenjualan, densityTera)
 		// endActual = endBooked hanya untuk INSERT baru.
 		// Pada UPDATE (conflict), endstock_actual TIDAK ditimpa (lihat DoUpdates).
 		endActual := endBooked
@@ -235,28 +273,24 @@ func (r *penyusutanRepository) getDailyReport(date string) ([]PenyusutanReportGr
 		return []PenyusutanReportGroup{}, nil
 	}
 
-	t, err := time.Parse("2006-01-02", date)
+	parsedDate, err := time.Parse("2006-01-02", date)
 	if err != nil {
 		return nil, err
 	}
-	waktuMulaiStr := date + " 06:00:00"
-	waktuSampaiStr := t.AddDate(0, 0, 1).Format("2006-01-02") + " 05:59:59"
+	waktuMulaiStr := date + " 00:00:00"
+	waktuSampaiStr := date + " 23:59:59"
 
 	// Format tanggal untuk tampilan di kolom Waktu (DD Mon YYYY)
-	waktuLabel := date
-	if parsed, err := time.Parse("2006-01-02", date); err == nil {
-		waktuLabel = parsed.Format("02 Jan 2006")
-	}
-
+	waktuLabel := parsedDate.Format("02 Jan 2006")
 
 	type nozzleRow struct {
 		BBMID            uint    `gorm:"column:bbm_id"`
 		BBMName          string  `gorm:"column:bbm_name"`
 		NozzleID         uint    `gorm:"column:nozzle_id"`
 		Disp             string  `gorm:"column:disp"`
-		TotalisatorAwal  int64   `gorm:"column:totalisator_awal"`  // dari shift PERTAMA (untuk tampilan)
-		TotalisatorAkhir int64   `gorm:"column:totalisator_akhir"` // dari shift TERAKHIR (untuk tampilan)
-		JmlLiter         int64   `gorm:"column:jml_liter"`         // SUM dari semua shift (nilai akurat)
+		TotalisatorAwal  float64 `gorm:"column:totalisator_awal"`  // dari shift PERTAMA (untuk tampilan)
+		TotalisatorAkhir float64 `gorm:"column:totalisator_akhir"` // dari shift TERAKHIR (untuk tampilan)
+		JmlLiter         float64 `gorm:"column:jml_liter"`         // SUM dari semua shift (nilai akurat)
 	}
 
 	var nozzleRows []nozzleRow
@@ -305,7 +339,6 @@ func (r *penyusutanRepository) getDailyReport(date string) ([]PenyusutanReportGr
 		return []PenyusutanReportGroup{}, nil
 	}
 
-
 	// ── First stock per BBM (dari trx_penyusutan pertama di hari itu) ──
 	type firstStockRow struct {
 		BBMID      uint    `gorm:"column:bbm_id"`
@@ -335,10 +368,12 @@ func (r *penyusutanRepository) getDailyReport(date string) ([]PenyusutanReportGr
 	}
 	var receives []receiveRow
 	if err2 := r.db.Raw(`
-		SELECT bbm_id, COALESCE(SUM(jml_liter), 0) AS total
-		FROM trx_kedatangan_bbm
-		WHERE tgl_kedatangan BETWEEN ? AND ?
-		GROUP BY bbm_id
+		SELECT k.bbm_id, COALESCE(SUM(k.jml_liter), 0) AS total
+		FROM trx_kedatangan_bbm k
+		JOIN trx_penjualan p ON k.shift_id = p.shift_id
+			AND k.tgl_kedatangan BETWEEN p.waktu_mulai AND p.waktu_akhir
+		WHERE p.waktu_mulai BETWEEN ? AND ?
+		GROUP BY k.bbm_id
 	`, waktuMulaiStr, waktuSampaiStr).Scan(&receives).Error; err2 == nil {
 		for _, it := range receives {
 			receiveMap[it.BBMID] = it.Total
@@ -419,7 +454,6 @@ func (r *penyusutanRepository) getDailyReport(date string) ([]PenyusutanReportGr
 		g.TotalPenjualan += float64(nr.JmlLiter)
 	}
 
-
 	// ── Finalisasi kalkulasi per group BBM ──
 	groups := make([]PenyusutanReportGroup, 0, len(order))
 	for _, bbmID := range order {
@@ -460,14 +494,14 @@ func (r *penyusutanRepository) getMonthlyReport(month string) ([]PenyusutanRepor
 
 	// ── Baris detail (per nozzle per penjualan) ──
 	type baseRow struct {
-		PenjualanID      uint64 `gorm:"column:penjualan_id"`
-		BBMID            uint   `gorm:"column:bbm_id"`
-		BBMName          string `gorm:"column:bbm_name"`
-		Waktu            string `gorm:"column:waktu"`
-		Disp             string `gorm:"column:disp"`
-		TotalisatorAwal  int64  `gorm:"column:totalisator_awal"`
-		TotalisatorAkhir int64  `gorm:"column:totalisator_akhir"`
-		TotalPenjualan   int64  `gorm:"column:total_penjualan"`
+		PenjualanID      uint64  `gorm:"column:penjualan_id"`
+		BBMID            uint    `gorm:"column:bbm_id"`
+		BBMName          string  `gorm:"column:bbm_name"`
+		Waktu            string  `gorm:"column:waktu"`
+		Disp             string  `gorm:"column:disp"`
+		TotalisatorAwal  float64 `gorm:"column:totalisator_awal"`
+		TotalisatorAkhir float64 `gorm:"column:totalisator_akhir"`
+		TotalPenjualan   float64 `gorm:"column:total_penjualan"`
 	}
 
 	var rows []baseRow
@@ -486,7 +520,7 @@ func (r *penyusutanRepository) getMonthlyReport(month string) ([]PenyusutanRepor
 		LEFT JOIN bbm b ON b.id = d.bbm_id
 		LEFT JOIN nozzles n ON n.id = d.nozzle_id
 		WHERE `+where+`
-		ORDER BY b.name ASC, p.waktu_mulai ASC, n.description ASC
+		ORDER BY b.name ASC, p.waktu_mulai ASC, p.shift_id ASC, n.description ASC
 	`, args...).Scan(&rows).Error
 	if err != nil {
 		return nil, err
@@ -528,9 +562,11 @@ func (r *penyusutanRepository) getMonthlyReport(month string) ([]PenyusutanRepor
 	if err2 := r.db.Raw(`
 		SELECT k.bbm_id, COALESCE(SUM(k.jml_liter), 0) AS total
 		FROM trx_kedatangan_bbm k
-		WHERE TO_CHAR(k.tgl_kedatangan, 'YYYY-MM') = ?
+		JOIN trx_penjualan p ON k.shift_id = p.shift_id
+			AND k.tgl_kedatangan BETWEEN p.waktu_mulai AND p.waktu_akhir
+		WHERE `+where+`
 		GROUP BY k.bbm_id
-	`, month).Scan(&receives).Error; err2 == nil {
+	`, args...).Scan(&receives).Error; err2 == nil {
 		for _, it := range receives {
 			receiveMap[it.BBMID] = it.Total
 		}
@@ -605,7 +641,6 @@ func (r *penyusutanRepository) getMonthlyReport(month string) ([]PenyusutanRepor
 		g.TotalPenjualan += float64(rrow.TotalPenjualan)
 	}
 
-
 	groups := make([]PenyusutanReportGroup, 0, len(order))
 	for _, bbmID := range order {
 		g := groupsMap[bbmID]
@@ -643,18 +678,16 @@ func (r *penyusutanRepository) GetShiftReport(date string) ([]PenyusutanShiftGro
 		return []PenyusutanShiftGroup{}, nil
 	}
 
-	t, err := time.Parse("2006-01-02", date)
-	if err != nil {
-		return nil, err
-	}
-	waktuMulaiStr := date + " 06:00:00"
-	waktuSampaiStr := t.AddDate(0, 0, 1).Format("2006-01-02") + " 05:59:59"
+	waktuMulaiStr := date + " 00:00:00"
+	waktuSampaiStr := date + " 23:59:59"
 
 	// ── Ambil semua baris nozzle untuk tanggal ini ──
 	type shiftNozzleRow struct {
 		PenjualanID      uint64  `gorm:"column:penjualan_id"`
 		NoForm           string  `gorm:"column:no_form"`
+		ShiftID          uint    `gorm:"column:shift_id"`
 		ShiftName        string  `gorm:"column:shift_name"`
+		IsCrossDay       bool    `gorm:"column:is_cross_day"`
 		WaktuMulai       string  `gorm:"column:waktu_mulai"`
 		WaktuAkhir       string  `gorm:"column:waktu_akhir"`
 		BBMID            uint    `gorm:"column:bbm_id"`
@@ -669,11 +702,13 @@ func (r *penyusutanRepository) GetShiftReport(date string) ([]PenyusutanShiftGro
 	}
 
 	var nozzleRows []shiftNozzleRow
-	err = r.db.Raw(`
+	err := r.db.Raw(`
 		SELECT
 			p.id_penjualan                                               AS penjualan_id,
 			p.no_penjualan                                               AS no_form,
-			COALESCE(s.shift_name, 'Shift ' || p.shift_id::text)              AS shift_name,
+			p.shift_id                                                   AS shift_id,
+			COALESCE(s.shift_name, 'Shift ' || p.shift_id::text)         AS shift_name,
+			COALESCE(s.is_cross_day, false)                              AS is_cross_day,
 			TO_CHAR(p.waktu_mulai, 'DD Mon YYYY HH24:MI')               AS waktu_mulai,
 			TO_CHAR(p.waktu_akhir, 'DD Mon YYYY HH24:MI')               AS waktu_akhir,
 			d.bbm_id,
@@ -692,7 +727,7 @@ func (r *penyusutanRepository) GetShiftReport(date string) ([]PenyusutanShiftGro
 		LEFT JOIN shifts s ON s.id = p.shift_id
 		LEFT JOIN trx_penyusutan ps ON ps.penjualan_id = p.id_penjualan AND ps.bbm_id = d.bbm_id
 		WHERE p.waktu_mulai BETWEEN ? AND ?
-		ORDER BY p.waktu_mulai ASC, b.name ASC, n.description ASC
+		ORDER BY s.id ASC, p.waktu_mulai ASC, b.name ASC, n.description ASC
 	`, waktuMulaiStr, waktuSampaiStr).Scan(&nozzleRows).Error
 	if err != nil {
 		return nil, err
@@ -781,7 +816,9 @@ func (r *penyusutanRepository) GetShiftReport(date string) ([]PenyusutanShiftGro
 			shiftMeta[pID] = PenyusutanShiftGroup{
 				PenjualanID: pID,
 				NoForm:      row.NoForm,
+				ShiftID:     row.ShiftID,
 				ShiftName:   row.ShiftName,
+				IsCrossDay:  row.IsCrossDay,
 				WaktuMulai:  row.WaktuMulai,
 				WaktuAkhir:  row.WaktuAkhir,
 			}
@@ -795,6 +832,7 @@ func (r *penyusutanRepository) GetShiftReport(date string) ([]PenyusutanShiftGro
 				BBMID:           bID,
 				JenisBBM:        row.BBMName,
 				PenyusutanID:    row.PenyusutanID,
+				EditToken:       helper.EncodePenyusutanToken(bID, row.ShiftID, pID),
 				StokAwal:        row.FirstStock,
 				TotalPenerimaan: receiveShiftMap[receiveKey{pID, bID}],
 				Nozzles:         []PenyusutanShiftNozzle{},
@@ -856,4 +894,188 @@ func (r *penyusutanRepository) UpdateEndstockActual(id uint64, actual float64, u
 		"updated_by":      updatedBy,
 		"updated":         time.Now(),
 	}).Error
+}
+
+// ─── GetEditData ─────────────────────────────────────────────────────────────
+// Mengambil rincian data penyusutan untuk 1 BBM & 1 Shift untuk di-edit.
+func (r *penyusutanRepository) GetEditData(bbmID uint, shiftID uint, penjualanID uint64) (*PenyusutanEditData, error) {
+	var p entity.TrxPenjualan
+	if err := r.db.Preload("Shift").First(&p, "id_penjualan = ?", penjualanID).Error; err != nil {
+		return nil, err
+	}
+
+	var bbm entity.BBM
+	if err := r.db.First(&bbm, bbmID).Error; err != nil {
+		return nil, err
+	}
+
+	shiftName := fmt.Sprintf("Shift %d", shiftID)
+	if p.Shift != nil && p.Shift.ShiftName != "" {
+		shiftName = p.Shift.ShiftName
+	}
+
+	// Baris detail nozzle
+	type nozzleRow struct {
+		Disp             string  `gorm:"column:disp"`
+		TotalisatorAwal  float64 `gorm:"column:totalisator_awal"`
+		TotalisatorAkhir float64 `gorm:"column:totalisator_akhir"`
+		JmlLiter         float64 `gorm:"column:jml_liter"`
+	}
+
+	var nRows []nozzleRow
+	err := r.db.Raw(`
+		SELECT
+			COALESCE(n.description, '-') AS disp,
+			d.totalisator_awal,
+			d.totalisator_akhir,
+			d.jml_liter
+		FROM trx_penjualan_detail d
+		LEFT JOIN nozzles n ON n.id = d.nozzle_id
+		WHERE d.penjualan_id = ? AND d.bbm_id = ?
+		ORDER BY n.description ASC
+	`, penjualanID, bbmID).Scan(&nRows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	var nozzles []PenyusutanShiftNozzle
+	var totalPenjualan float64
+	for _, nr := range nRows {
+		nozzles = append(nozzles, PenyusutanShiftNozzle{
+			Disp:             nr.Disp,
+			TotalisatorAwal:  nr.TotalisatorAwal,
+			TotalisatorAkhir: nr.TotalisatorAkhir,
+			JmlLiter:         nr.JmlLiter,
+		})
+		totalPenjualan += nr.JmlLiter
+	}
+
+	// Total penerimaan BBM di shift ini
+	var totalPenerimaan float64
+	r.db.Raw(`
+		SELECT COALESCE(SUM(k.jml_liter), 0)
+		FROM trx_kedatangan_bbm k
+		WHERE k.shift_id = ? AND k.bbm_id = ? AND k.tgl_kedatangan BETWEEN ? AND ?
+	`, shiftID, bbmID, p.WaktuMulai, p.WaktuAkhir).Scan(&totalPenerimaan)
+
+	// Total density/tera di shift ini
+	var densityTera float64
+	r.db.Raw(`
+		SELECT COALESCE(SUM(pt.qty_liter), 0)
+		FROM trx_penjualan_pengeluaran_test pt
+		WHERE pt.penjualan_id = ? AND pt.bbm_id = ?
+	`, penjualanID, bbmID).Scan(&densityTera)
+
+	// Single record penyusutan jika sudah ada
+	var ps entity.TrxPenyusutan
+	stokAwal := float64(0)
+	stokAktual := float64(0)
+	var penyusutanID uint64
+
+	if err := r.db.First(&ps, "penjualan_id = ? AND bbm_id = ?", penjualanID, bbmID).Error; err == nil {
+		penyusutanID = ps.ID
+		stokAwal = ps.FirstStock
+		stokAktual = ps.EndstockActual
+	}
+
+	penjualanMinTera := totalPenjualan - densityTera
+	stokCatatan := (stokAwal + totalPenerimaan) - penjualanMinTera
+	penyusutanVal := stokAktual - stokCatatan
+	persentasi := float64(0)
+	if penjualanMinTera > 0 {
+		persentasi = (penyusutanVal / penjualanMinTera) * 100
+	}
+
+	waktuDate := p.WaktuMulai.Format("2006-01-02")
+	waktuLabel := p.WaktuMulai.Format("02 Jan 2006")
+	token := helper.EncodePenyusutanToken(bbmID, shiftID, penjualanID)
+
+	return &PenyusutanEditData{
+		PenyusutanID:     penyusutanID,
+		PenjualanID:      penjualanID,
+		NoForm:           p.NoPenjualan,
+		ShiftID:          shiftID,
+		ShiftName:        shiftName,
+		WaktuDate:        waktuDate,
+		WaktuLabel:       waktuLabel,
+		WaktuMulai:       p.WaktuMulai.Format("15:04"),
+		WaktuAkhir:       p.WaktuAkhir.Format("15:04"),
+		BBMID:            bbmID,
+		NamaBBM:          bbm.Name,
+		StokAwal:         stokAwal,
+		TotalPenerimaan:  totalPenerimaan,
+		Nozzles:          nozzles,
+		TotalPenjualan:   totalPenjualan,
+		DensityTera:      densityTera,
+		PenjualanMinTera: penjualanMinTera,
+		StokAkhirAktual:  stokAktual,
+		StokAkhirCatatan: stokCatatan,
+		Penyusutan:       penyusutanVal,
+		Persentasi:       persentasi,
+		EditToken:        token,
+	}, nil
+}
+
+// ─── SaveEditData ─────────────────────────────────────────────────────────────
+// Menyimpan atau meng-update data penyusutan dari form edit.
+func (r *penyusutanRepository) SaveEditData(penjualanID uint64, bbmID uint, shiftID uint, stokAwal float64, stokAktual float64, updatedBy *uint) error {
+	var p entity.TrxPenjualan
+	if err := r.db.First(&p, "id_penjualan = ?", penjualanID).Error; err != nil {
+		return err
+	}
+
+	// Compute totalPenjualan
+	var totalPenjualan float64
+	r.db.Raw(`
+		SELECT COALESCE(SUM(jml_liter), 0)
+		FROM trx_penjualan_detail
+		WHERE penjualan_id = ? AND bbm_id = ?
+	`, penjualanID, bbmID).Scan(&totalPenjualan)
+
+	// Compute totalPenerimaan
+	var totalPenerimaan float64
+	r.db.Raw(`
+		SELECT COALESCE(SUM(k.jml_liter), 0)
+		FROM trx_kedatangan_bbm k
+		WHERE k.shift_id = ? AND k.bbm_id = ? AND k.tgl_kedatangan BETWEEN ? AND ?
+	`, shiftID, bbmID, p.WaktuMulai, p.WaktuAkhir).Scan(&totalPenerimaan)
+
+	// Compute densityTera
+	var densityTera float64
+	r.db.Raw(`
+		SELECT COALESCE(SUM(pt.qty_liter), 0)
+		FROM trx_penjualan_pengeluaran_test pt
+		WHERE pt.penjualan_id = ? AND pt.bbm_id = ?
+	`, penjualanID, bbmID).Scan(&densityTera)
+
+	penjualanMinTera := totalPenjualan - densityTera
+	stokCatatan := (stokAwal + totalPenerimaan) - penjualanMinTera
+
+	var ps entity.TrxPenyusutan
+	err := r.db.First(&ps, "penjualan_id = ? AND bbm_id = ?", penjualanID, bbmID).Error
+	if err != nil {
+		// Create record baru
+		newPs := entity.TrxPenyusutan{
+			PenjualanID:    penjualanID,
+			NoForm:         p.NoPenjualan,
+			ShiftID:        shiftID,
+			Waktu:          p.WaktuMulai,
+			BBMID:          bbmID,
+			FirstStock:     stokAwal,
+			EndstockActual: stokAktual,
+			EndstockBooked: stokCatatan,
+			CreatedBy:      updatedBy,
+			UpdatedBy:      updatedBy,
+		}
+		return r.db.Create(&newPs).Error
+	}
+
+	// Update record yang ada
+	ps.FirstStock = stokAwal
+	ps.EndstockActual = stokAktual
+	ps.EndstockBooked = stokCatatan
+	ps.UpdatedBy = updatedBy
+	ps.Updated = time.Now()
+
+	return r.db.Save(&ps).Error
 }

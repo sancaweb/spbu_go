@@ -76,12 +76,12 @@ type TrxPiutangDetail struct {
 	DriverName string `gorm:"column:driver_name;type:varchar(100)" json:"driver_name"`
 
 	// BBM & kalkulasi
-	BBMID     uint  `gorm:"column:bbm_id;not null" json:"bbm_id"`
-	BBM       *BBM  `gorm:"foreignKey:BBMID" json:"bbm,omitempty"`
-	HargaBBM  int64 `gorm:"column:harga_bbm;type:bigint;not null;default:0" json:"harga_bbm"` // harga jual per liter saat transaksi
-	Margin    int64 `gorm:"column:margin;type:bigint;not null;default:0" json:"margin"`       // margin per liter (untuk jurnal HPP)
-	QtyLiter  int64 `gorm:"column:qty_liter;type:bigint;not null;default:0" json:"qty_liter"`
-	TotalLine int64 `gorm:"column:total_line;type:bigint;not null;default:0" json:"total_line"` // harga_bbm × qty_liter
+	BBMID     uint    `gorm:"column:bbm_id;not null" json:"bbm_id"`
+	BBM       *BBM    `gorm:"foreignKey:BBMID" json:"bbm,omitempty"`
+	HargaBBM  int64   `gorm:"column:harga_bbm;type:bigint;not null;default:0" json:"harga_bbm"` // harga jual per liter saat transaksi
+	Margin    int64   `gorm:"column:margin;type:bigint;not null;default:0" json:"margin"`       // margin per liter (untuk jurnal HPP)
+	QtyLiter  float64 `gorm:"column:qty_liter;type:numeric(20,8);not null;default:0" json:"qty_liter"`
+	TotalLine int64   `gorm:"column:total_line;type:bigint;not null;default:0" json:"total_line"` // harga_bbm × qty_liter
 
 	// Audit
 	Created   time.Time `gorm:"column:created;autoCreateTime" json:"created"`

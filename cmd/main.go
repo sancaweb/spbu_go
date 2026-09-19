@@ -142,12 +142,42 @@ func main() {
 		contact_person VARCHAR(255),
 		phone VARCHAR(50),
 		address TEXT,
-		is_active BOOLEAN DEFAULT TRUE,
+		start_date DATE,
+		end_date DATE,
+		isactive BOOLEAN NOT NULL DEFAULT TRUE,
+		auto_off BOOLEAN NOT NULL DEFAULT FALSE,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		updated_by INT NULL REFERENCES users(id) ON DELETE SET NULL,
 		deleted_at TIMESTAMP NULL
 	)`)
+
+	// Migrate partner cooperation fields and keep the requested legacy-compatible
+	// status column name: isactive (without an underscore).
+	database.DB.Exec(`DO $$ BEGIN
+		IF NOT EXISTS (
+			SELECT 1 FROM information_schema.columns
+			WHERE table_name = 'partners' AND column_name = 'isactive'
+		) THEN
+			IF EXISTS (
+				SELECT 1 FROM information_schema.columns
+				WHERE table_name = 'partners' AND column_name = 'is_active'
+			) THEN
+				ALTER TABLE partners RENAME COLUMN is_active TO isactive;
+			ELSE
+				ALTER TABLE partners ADD COLUMN isactive BOOLEAN NOT NULL DEFAULT TRUE;
+			END IF;
+		END IF;
+		ALTER TABLE partners ADD COLUMN IF NOT EXISTS start_date DATE;
+		ALTER TABLE partners ADD COLUMN IF NOT EXISTS end_date DATE;
+		ALTER TABLE partners ADD COLUMN IF NOT EXISTS auto_off BOOLEAN NOT NULL DEFAULT FALSE;
+		UPDATE partners SET isactive = TRUE WHERE isactive IS NULL;
+		ALTER TABLE partners ALTER COLUMN isactive SET DEFAULT TRUE;
+		ALTER TABLE partners ALTER COLUMN isactive SET NOT NULL;
+		UPDATE partners SET auto_off = FALSE WHERE auto_off IS NULL;
+		ALTER TABLE partners ALTER COLUMN auto_off SET DEFAULT FALSE;
+		ALTER TABLE partners ALTER COLUMN auto_off SET NOT NULL;
+	END $$`)
 
 	// Create jabatan table
 	database.DB.Exec(`CREATE TABLE IF NOT EXISTS jabatan (
@@ -457,9 +487,9 @@ func main() {
 		bbm_id              INT         NOT NULL REFERENCES bbm(id) ON DELETE RESTRICT,
 		bbm_price           BIGINT      NOT NULL DEFAULT 0,
 		margin              BIGINT      NOT NULL DEFAULT 0,
-		totalisator_awal    BIGINT      NOT NULL DEFAULT 0,
-		totalisator_akhir   BIGINT      NOT NULL DEFAULT 0,
-		jml_liter           BIGINT      NOT NULL DEFAULT 0,
+		totalisator_awal    NUMERIC(20,8) NOT NULL DEFAULT 0,
+		totalisator_akhir   NUMERIC(20,8) NOT NULL DEFAULT 0,
+		jml_liter           NUMERIC(20,8) NOT NULL DEFAULT 0,
 		jml_rupiah          BIGINT      NOT NULL DEFAULT 0
 	)`)
 
@@ -588,7 +618,7 @@ func main() {
 		penjualan_id    BIGINT      NOT NULL REFERENCES trx_penjualan(id_penjualan) ON DELETE CASCADE,
 		jenis_test_id   INT         NOT NULL REFERENCES jenis_test(id) ON DELETE RESTRICT,
 		bbm_id          INT         NOT NULL REFERENCES bbm(id) ON DELETE RESTRICT,
-		qty_liter       BIGINT      NOT NULL DEFAULT 0,
+		qty_liter       NUMERIC(20,8) NOT NULL DEFAULT 0,
 		total_rupiah    BIGINT      NOT NULL DEFAULT 0,
 		created_at      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		updated_at      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -596,9 +626,24 @@ func main() {
 
 	// NOTE: legacy rows from old schema may not have penjualan_id; keep migration tolerant.
 
+	// Preserve fractional totalisator/liter values from legacy transactions.
+	// Existing installations may still have BIGINT columns from the initial schema.
+	for _, alter := range []string{
+		`ALTER TABLE trx_penjualan_detail ALTER COLUMN totalisator_awal TYPE NUMERIC(20,8) USING totalisator_awal::NUMERIC`,
+		`ALTER TABLE trx_penjualan_detail ALTER COLUMN totalisator_akhir TYPE NUMERIC(20,8) USING totalisator_akhir::NUMERIC`,
+		`ALTER TABLE trx_penjualan_detail ALTER COLUMN jml_liter TYPE NUMERIC(20,8) USING jml_liter::NUMERIC`,
+		`ALTER TABLE trx_penjualan_pengeluaran_test ALTER COLUMN qty_liter TYPE NUMERIC(20,8) USING qty_liter::NUMERIC`,
+		`ALTER TABLE trx_piutang_detail ALTER COLUMN qty_liter TYPE NUMERIC(20,8) USING qty_liter::NUMERIC`,
+	} {
+		if err := database.DB.Exec(alter).Error; err != nil {
+			log.Printf("Decimal migration warning: %v", err)
+		}
+	}
+
 	// Auto Migrate (enabled for easier setup)
 	if err := database.DB.AutoMigrate(
 		&entity.Setting{},
+		&entity.LegacyDBConnection{},
 		&entity.User{},
 		&entity.Role{},
 		&entity.Permission{},
@@ -645,6 +690,7 @@ func main() {
 	nozzleRepo := repository.NewNozzleRepository(database.DB)
 	permissionRepo := repository.NewPermissionRepository(database.DB)
 	settingRepo := repository.NewSettingRepository(database.DB)
+	legacyConnectionRepo := repository.NewLegacyDBConnectionRepository(database.DB)
 	partnerRepo := repository.NewPartnerRepository(database.DB)
 	karyawanRepo := repository.NewKaryawanRepository(database.DB)
 	jabatanRepo := repository.NewJabatanRepository(database.DB)
@@ -666,6 +712,7 @@ func main() {
 	nozzleService := service.NewNozzleService(nozzleRepo)
 	permissionService := service.NewPermissionService(permissionRepo)
 	settingService := service.NewSettingService(settingRepo)
+	importDataService := service.NewImportDataService(legacyConnectionRepo, database.DB)
 	partnerService := service.NewPartnerService(partnerRepo)
 	karyawanService := service.NewKaryawanService(karyawanRepo)
 	jabatanService := service.NewJabatanService(jabatanRepo)
@@ -709,6 +756,7 @@ func main() {
 	tiangHandler := handler.NewTiangHandler(tiangService, bbmService)
 	nozzleHandler := handler.NewNozzleHandler(nozzleService)
 	settingHandler := handler.NewSettingHandler(settingService)
+	importDataHandler := handler.NewImportDataHandler(importDataService)
 	partnerHandler := handler.NewPartnerHandler(partnerService)
 	karyawanHandler := handler.NewKaryawanHandler(karyawanService, jabatanService, pendapatanService, potonganService)
 	jabatanHandler := handler.NewJabatanHandler(jabatanService)
@@ -722,7 +770,7 @@ func main() {
 	kedatanganBBMHandler := handler.NewKedatanganBBMHandler(kedatanganService, shiftService)
 	penjualanRepo := repository.NewPenjualanRepository(database.DB)
 	penjualanService := service.NewPenjualanService(penjualanRepo, accountingService)
-	penjualanHandler := handler.NewPenjualanHandler(penjualanService, penyusutanService, tiangService, shiftService, settingService, jenisTestService, bbmService)
+	penjualanHandler := handler.NewPenjualanHandler(penjualanService, penyusutanService, tiangService, shiftService, settingService, jenisTestService, bbmService, partnerService)
 	jenisTestHandler := handler.NewJenisTestHandler(jenisTestService)
 	penyusutanHandler := handler.NewPenyusutanHandler(penyusutanService)
 	piutangRepo := repository.NewPiutangRepository(database.DB)
@@ -809,6 +857,14 @@ func main() {
 		protected.POST("/settings", settingHandler.Update)
 		protected.POST("/settings/favicon", settingHandler.UploadFavicon)
 
+		// Import Data Routes
+		protected.GET("/settings/import-data", importDataHandler.Index)
+		protected.POST("/settings/import-data/connection", importDataHandler.SaveConnection)
+		protected.POST("/settings/import-data/connection/test", importDataHandler.TestConnection)
+		protected.GET("/settings/import-data/bbm/data", importDataHandler.DownloadBBMData)
+		protected.GET("/settings/import-data/bbm/template", importDataHandler.DownloadBBMTemplate)
+		protected.POST("/settings/import-data/bbm/import", importDataHandler.ImportBBM)
+
 		// Master Routes
 		master := protected.Group("/master")
 		{
@@ -841,6 +897,7 @@ func main() {
 				partner.POST("", partnerHandler.Create)
 				partner.POST("/:id", partnerHandler.Update)
 				partner.POST("/:id/delete", partnerHandler.Delete)
+				partner.POST("/:id/delete-permanent", partnerHandler.DeletePermanent)
 				partner.POST("/:id/restore", partnerHandler.Restore)
 			}
 			employee := master.Group("/employee")
@@ -942,6 +999,8 @@ func main() {
 			transaction.GET("/penjualan", penjualanHandler.Index)
 			transaction.POST("/penjualan/datatable", penjualanHandler.Datatable)
 			transaction.GET("/penjualan/create", penjualanHandler.FormCreate)
+			transaction.GET("/penjualan/upload/template", penjualanHandler.DownloadSalesReportTemplate)
+			transaction.POST("/penjualan/upload", penjualanHandler.UploadSalesReport)
 			// last-totalisator harus SEBELUM /:id route agar tidak ditangkap sebagai param
 			transaction.GET("/penjualan/last-totalisator", penjualanHandler.LastTotalisator)
 			transaction.POST("/penjualan", penjualanHandler.Create)
@@ -950,6 +1009,8 @@ func main() {
 			transaction.POST("/penjualan/:id", penjualanHandler.Update)
 			transaction.POST("/penjualan/:id/delete", penjualanHandler.Delete)
 			transaction.GET("/penyusutan", penyusutanHandler.Index)
+			transaction.GET("/penyusutan/view_edit/:token", penyusutanHandler.ViewEdit)
+			transaction.POST("/penyusutan/edit", penyusutanHandler.SaveEdit)
 			transaction.POST("/penyusutan/:id/actual", penyusutanHandler.UpdateEndstockActual)
 
 			// Piutang B2B — tagihan penjualan kredit ke partner

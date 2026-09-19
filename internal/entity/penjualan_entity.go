@@ -62,10 +62,10 @@ type TrxPenjualanDetail struct {
 	Margin   int64 `gorm:"column:margin;type:bigint;not null;default:0" json:"margin"`       // margin per liter
 
 	// Totalisator & volume
-	TotalisatorAwal  int64 `gorm:"column:totalisator_awal;type:bigint;not null;default:0" json:"totalisator_awal"`
-	TotalisatorAkhir int64 `gorm:"column:totalisator_akhir;type:bigint;not null;default:0" json:"totalisator_akhir"`
-	JmlLiter         int64 `gorm:"column:jml_liter;type:bigint;not null;default:0" json:"jml_liter"`   // totalisator_akhir - totalisator_awal
-	JmlRupiah        int64 `gorm:"column:jml_rupiah;type:bigint;not null;default:0" json:"jml_rupiah"` // jml_liter × bbm_price
+	TotalisatorAwal  float64 `gorm:"column:totalisator_awal;type:numeric(20,8);not null;default:0" json:"totalisator_awal"`
+	TotalisatorAkhir float64 `gorm:"column:totalisator_akhir;type:numeric(20,8);not null;default:0" json:"totalisator_akhir"`
+	JmlLiter         float64 `gorm:"column:jml_liter;type:numeric(20,8);not null;default:0" json:"jml_liter"` // totalisator_akhir - totalisator_awal
+	JmlRupiah        int64   `gorm:"column:jml_rupiah;type:bigint;not null;default:0" json:"jml_rupiah"`      // jml_liter × bbm_price
 }
 
 func (TrxPenjualanDetail) TableName() string { return "trx_penjualan_detail" }
@@ -79,7 +79,7 @@ type TrxPenjualanPengeluaranTest struct {
 	JenisTest   *JenisTest `gorm:"foreignKey:JenisTestID" json:"jenis_test,omitempty"`
 	BBMID       uint       `gorm:"column:bbm_id;not null" json:"bbm_id"`
 	BBM         *BBM       `gorm:"foreignKey:BBMID" json:"bbm,omitempty"`
-	QtyLiter    int64      `gorm:"column:qty_liter;type:bigint;not null;default:0" json:"qty_liter"`
+	QtyLiter    float64    `gorm:"column:qty_liter;type:numeric(20,8);not null;default:0" json:"qty_liter"`
 	TotalRupiah int64      `gorm:"column:total_rupiah;type:bigint;not null;default:0" json:"total_rupiah"`
 	CreatedAt   time.Time  `gorm:"column:created_at;autoCreateTime" json:"created_at"`
 	UpdatedAt   time.Time  `gorm:"column:updated_at;autoUpdateTime" json:"updated_at"`

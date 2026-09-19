@@ -10,11 +10,12 @@ type PartnerService interface {
 	GetAll() ([]entity.Partner, error)
 	GetActive() ([]entity.Partner, error)
 	GetInactive() ([]entity.Partner, error)
-	Datatable(req dto.DatatableRequest, isActive bool) (int64, int64, []entity.Partner, error)
+	Datatable(req dto.DatatableRequest, isActive bool) (int64, int64, []dto.PartnerDTRow, error)
 	GetByID(id uint) (entity.Partner, error)
 	Create(partner *entity.Partner) error
 	Update(partner *entity.Partner) error
 	Delete(id uint) error
+	DeletePermanent(id uint) error
 	Restore(id uint) error
 }
 
@@ -38,7 +39,7 @@ func (s *partnerService) GetInactive() ([]entity.Partner, error) {
 	return s.repo.FindInactive()
 }
 
-func (s *partnerService) Datatable(req dto.DatatableRequest, isActive bool) (int64, int64, []entity.Partner, error) {
+func (s *partnerService) Datatable(req dto.DatatableRequest, isActive bool) (int64, int64, []dto.PartnerDTRow, error) {
 	return s.repo.Datatable(req, isActive)
 }
 
@@ -56,6 +57,10 @@ func (s *partnerService) Update(partner *entity.Partner) error {
 
 func (s *partnerService) Delete(id uint) error {
 	return s.repo.Delete(id)
+}
+
+func (s *partnerService) DeletePermanent(id uint) error {
+	return s.repo.DeletePermanent(id)
 }
 
 func (s *partnerService) Restore(id uint) error {

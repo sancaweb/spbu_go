@@ -1,0 +1,242 @@
+{{ define "settings/import_data.html" }} {{ template "header.html" . }}
+
+<div x-data="importDataManager()" x-cloak class="space-y-6">
+  <div>
+    <h2 class="text-3xl font-bold text-slate-800">Import Data</h2>
+    <p class="mt-1 text-slate-500">
+      Pindahkan data dari sistem lama ke sistem baru secara bertahap.
+    </p>
+  </div>
+
+  <section class="glass-card rounded-2xl bg-white p-6 shadow-lg">
+    <div class="mb-5 flex items-start gap-3">
+      <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-[#005596]">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+        </svg>
+      </div>
+      <div>
+        <h3 class="text-lg font-bold text-slate-800">Koneksi Sistem Lama</h3>
+        <p class="text-sm text-slate-500">Disimpan terenkripsi dan digunakan hanya saat mengambil data.</p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+      <label class="text-sm font-medium text-slate-600">
+        Driver
+        <select x-model="connection.driver" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+          <option value="mysql">MySQL</option>
+          <option value="mariadb">MariaDB</option>
+        </select>
+      </label>
+      <label class="text-sm font-medium text-slate-600">
+        Host
+        <input x-model="connection.host" type="text" placeholder="127.0.0.1" class="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5" />
+      </label>
+      <label class="text-sm font-medium text-slate-600">
+        Port
+        <input x-model="connection.port" type="number" min="1" max="65535" placeholder="3306" class="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5" />
+      </label>
+      <label class="text-sm font-medium text-slate-600">
+        Database
+        <input x-model="connection.database_name" type="text" placeholder="database_lama" class="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5" />
+      </label>
+      <label class="text-sm font-medium text-slate-600">
+        Username
+        <input x-model="connection.username" type="text" autocomplete="username" class="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5" />
+      </label>
+      <label class="text-sm font-medium text-slate-600">
+        Password
+        <input x-model="connection.password" type="password" autocomplete="new-password" placeholder="Kosongkan jika tidak berubah" class="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5" />
+      </label>
+      <label class="text-sm font-medium text-slate-600">
+        Mode SSL
+        <select x-model="connection.ssl_mode" class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+          <option value="false">Nonaktif</option>
+          <option value="preferred">Preferred</option>
+          <option value="true">Wajib</option>
+          <option value="skip-verify">Wajib, tanpa verifikasi sertifikat</option>
+        </select>
+      </label>
+      <div class="flex items-end gap-2">
+        <button @click="testConnection()" :disabled="connectionBusy" class="flex-1 rounded-xl border border-[#005596] px-4 py-2.5 font-medium text-[#005596] transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50">
+          <span x-show="connectionBusy" class="mr-1 inline-block h-4 w-4 animate-spin rounded-full border-2 border-[#005596] border-l-transparent align-middle"></span>
+          Tes Koneksi
+        </button>
+        <button @click="saveConnection()" :disabled="connectionBusy" class="flex-1 rounded-xl bg-[#005596] px-4 py-2.5 font-medium text-white shadow-lg transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50">
+          Simpan
+        </button>
+      </div>
+    </div>
+    <p class="mt-3 text-xs text-slate-400" x-show="connection.has_password">
+      Password sudah tersimpan. Kosongkan field password jika ingin memakai password tersimpan.
+    </p>
+  </section>
+
+  <section class="glass-card overflow-hidden rounded-2xl bg-white shadow-lg">
+    <div class="overflow-x-auto border-b border-slate-200 px-4 pt-4">
+      <div class="flex min-w-max gap-2">
+        <template x-for="tab in tabs" :key="tab.key">
+          <button type="button" @click="activeTab = tab.key" :class="activeTab === tab.key ? 'border-[#005596] bg-blue-50 text-[#005596]' : 'border-transparent text-slate-500 hover:bg-slate-50'" class="rounded-t-xl border-b-2 px-4 py-3 text-sm font-semibold transition" x-text="tab.label"></button>
+        </template>
+      </div>
+    </div>
+
+    <div x-show="activeTab === 'bbm'" class="p-6">
+      <div class="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-start">
+        <div>
+          <h3 class="text-xl font-bold text-slate-800">Import Master BBM</h3>
+          <p class="mt-1 max-w-2xl text-sm text-slate-500">
+            Ambil data BBM dari tabel <code class="rounded bg-slate-100 px-1">tb_bbm</code> sistem lama atau siapkan file Excel sendiri menggunakan template.
+          </p>
+        </div>
+        <span class="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">MVP tersedia</span>
+      </div>
+
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <button @click="downloadBBMData()" :disabled="bbmBusy" class="flex items-center justify-center gap-2 rounded-xl border border-[#005596] px-4 py-3 font-semibold text-[#005596] transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50">
+          <span x-show="bbmBusy === 'data'" class="h-4 w-4 animate-spin rounded-full border-2 border-[#005596] border-l-transparent"></span>
+          <svg x-show="bbmBusy !== 'data'" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M8 10l4 4m0 0l4-4m-4 4V3"></path></svg>
+          Get Data
+        </button>
+        <button @click="downloadBBMTemplate()" :disabled="bbmBusy" class="flex items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
+          <svg class="h-5 w-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"></path></svg>
+          Get Import Template
+        </button>
+        <button @click="$refs.bbmFile.click()" :disabled="bbmBusy" class="flex items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
+          <svg class="h-5 w-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+          Pilih File Excel
+        </button>
+      </div>
+      <input x-ref="bbmFile" type="file" accept=".xlsx" class="hidden" @change="selectBBMFile($event)" />
+
+      <div x-show="importFile" class="mt-4 flex flex-col justify-between gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4 md:flex-row md:items-center">
+        <div class="text-sm text-blue-900">
+          File dipilih: <strong x-text="importFile ? importFile.name : ''"></strong>
+        </div>
+        <button @click="importBBM()" :disabled="bbmBusy === 'import'" class="rounded-lg bg-[#005596] px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:opacity-50">
+          <span x-show="bbmBusy === 'import'" class="mr-1 inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-l-transparent align-middle"></span>
+          Import Data
+        </button>
+      </div>
+
+      <div class="mt-5 rounded-xl border border-slate-100 bg-slate-50 p-4 text-sm text-slate-600">
+        <p class="font-semibold text-slate-700">Kolom Excel BBM</p>
+        <p class="mt-1">name, margin, price, stock, reward_percent, dan is_active. Kolom source_id bersifat opsional sebagai referensi dari sistem lama.</p>
+        <p class="mt-2 text-xs text-slate-400">Import akan membuat BBM baru berdasarkan nama atau memperbarui BBM dengan nama yang sama. Data baru belum dianggap tersimpan sebelum proses import berhasil.</p>
+      </div>
+    </div>
+
+    <template x-for="tab in tabs.filter(item => item.key !== 'bbm')" :key="tab.key">
+      <div x-show="activeTab === tab.key" class="p-10 text-center">
+        <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+          <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z"></path></svg>
+        </div>
+        <h3 class="mt-4 text-lg font-bold text-slate-700" x-text="tab.label"></h3>
+        <p class="mt-1 text-sm text-slate-500">Fitur import modul ini akan disiapkan pada tahap berikutnya.</p>
+      </div>
+    </template>
+  </section>
+</div>
+
+<script>
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('importDataManager', () => ({
+      tabs: [
+        { key: 'bbm', label: 'Master BBM' },
+        { key: 'tiang', label: 'Master Tiang' },
+        { key: 'nozzle', label: 'Master Nozzle' },
+        { key: 'partner', label: 'Master Partner' },
+        { key: 'employee', label: 'Master Karyawan' },
+        { key: 'position', label: 'Master Jabatan' },
+        { key: 'income', label: 'Master Pendapatan' },
+        { key: 'deduction', label: 'Master Potongan' },
+        { key: 'shift', label: 'Master Shift' },
+        { key: 'test-type', label: 'Master Jenis Test' },
+        { key: 'wallet', label: 'Master Wallet' },
+        { key: 'delivery', label: 'Kedatangan BBM' },
+        { key: 'redemption', label: 'Penebusan' },
+        { key: 'sales', label: 'Penjualan' },
+        { key: 'receivable', label: 'Piutang' },
+        { key: 'shrinkage', label: 'Penyusutan' },
+      ],
+      activeTab: 'bbm',
+      connection: Object.assign({
+        driver: 'mysql', host: '', port: 3306, database_name: '', username: '', password: '', ssl_mode: 'false', has_password: false,
+      }, {{ .ConnectionJSON }}),
+      connectionBusy: false,
+      bbmBusy: '',
+      importFile: null,
+
+      async postConnection(url) {
+        this.connectionBusy = true;
+        try {
+          const form = new FormData();
+          ['driver', 'host', 'port', 'database_name', 'username', 'password', 'ssl_mode'].forEach((field) => form.append(field, this.connection[field] ?? ''));
+          const response = await fetch(url, { method: 'POST', body: form });
+          const data = await response.json();
+          if (!response.ok || !data.status) throw new Error(data.message || 'Permintaan koneksi gagal');
+          if (url.endsWith('/connection')) {
+            this.connection.password = '';
+            this.connection.has_password = true;
+          }
+          Swal.fire({ icon: 'success', title: 'Berhasil', text: data.message, timer: 1500, showConfirmButton: false });
+        } catch (error) {
+          Swal.fire({ icon: 'error', title: 'Gagal', text: error.message });
+        } finally {
+          this.connectionBusy = false;
+        }
+      },
+
+      testConnection() { return this.postConnection('/settings/import-data/connection/test'); },
+      saveConnection() { return this.postConnection('/settings/import-data/connection'); },
+
+      async downloadFile(url, fallbackName, busyKey) {
+        this.bbmBusy = busyKey;
+        try {
+          const response = await fetch(url);
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.message || 'File tidak dapat dibuat');
+          }
+          const blob = await response.blob();
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = fallbackName;
+          link.click();
+          URL.revokeObjectURL(link.href);
+        } catch (error) {
+          Swal.fire({ icon: 'error', title: 'Gagal', text: error.message });
+        } finally {
+          this.bbmBusy = '';
+        }
+      },
+
+      downloadBBMData() { return this.downloadFile('/settings/import-data/bbm/data', 'data_bbm_sistem_lama.xlsx', 'data'); },
+      downloadBBMTemplate() { return this.downloadFile('/settings/import-data/bbm/template', 'template_import_bbm.xlsx', 'template'); },
+      selectBBMFile(event) { this.importFile = event.target.files[0] || null; },
+
+      async importBBM() {
+        if (!this.importFile) return;
+        this.bbmBusy = 'import';
+        try {
+          const form = new FormData();
+          form.append('file', this.importFile);
+          const response = await fetch('/settings/import-data/bbm/import', { method: 'POST', body: form });
+          const data = await response.json();
+          if (!response.ok || !data.status) throw new Error(data.message || 'Import BBM gagal');
+          this.importFile = null;
+          if (this.$refs.bbmFile) this.$refs.bbmFile.value = '';
+          const result = data.result || {};
+          await Swal.fire({ icon: 'success', title: 'Import Berhasil', text: `${result.read || 0} data diproses. Dibuat: ${result.created || 0}, diperbarui: ${result.updated || 0}.`, confirmButtonText: 'OK' });
+        } catch (error) {
+          Swal.fire({ icon: 'error', title: 'Import Gagal', text: error.message });
+        } finally {
+          this.bbmBusy = '';
+        }
+      },
+    }));
+  });
+</script>
+
+{{ template "footer.html" . }} {{ end }}

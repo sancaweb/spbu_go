@@ -5,6 +5,11 @@
   rel="stylesheet"
   href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
 />
+<style>
+  [x-cloak] {
+    display: none !important;
+  }
+</style>
 
 <!-- ── Embedded data blocks ──────────────────────────────────────────────── -->
 <script type="application/json" id="nozzle-data">
@@ -27,6 +32,9 @@
 </script>
 <script type="application/json" id="bbm-data">
   {{ .BBMsJSON }}
+</script>
+<script type="application/json" id="partner-data">
+  {{ .PartnersJSON }}
 </script>
 <script type="application/json" id="pengeluaran-test-data">
   {{ .PengeluaranTestsJSON }}
@@ -167,6 +175,75 @@
     </div>
   </div>
 
+  <!-- Upload laporan penjualan: hanya mengisi totalisator nozzle -->
+  <div
+    class="relative bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6"
+    :aria-busy="isUploadingReport"
+  >
+    <div
+      x-show="isUploadingReport"
+      x-cloak
+      x-transition.opacity
+      class="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/80"
+      role="status"
+      aria-live="polite"
+    >
+      <div class="flex flex-col items-center gap-2 text-center">
+        <span
+          class="h-10 w-10 rounded-full border-4 border-blue-100 border-t-blue-600 animate-spin"
+          aria-hidden="true"
+        ></span>
+        <p class="text-sm font-semibold text-blue-700">Mengunggah laporan...</p>
+        <p class="text-xs text-gray-500">Data nozzle sedang diproses, mohon tunggu.</p>
+      </div>
+    </div>
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div>
+        <h2 class="font-semibold text-gray-700 flex items-center gap-2">
+          <i class="fas fa-file-upload text-blue-500"></i>
+          Upload Laporan Penjualan
+        </h2>
+        <p class="text-xs text-gray-500 mt-1">
+          Upload Excel untuk mengisi totalisator seluruh nozzle aktif. Piutang B2B
+          dan Pengeluaran Test tetap diinput manual dan tidak akan diubah.
+        </p>
+        <p class="text-[11px] text-gray-400 mt-1">
+          Gunakan template Excel yang tersedia. File harus memuat seluruh nozzle aktif.
+        </p>
+      </div>
+      <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+        <a
+          href="/transaction/penjualan/upload/template"
+          class="inline-flex items-center justify-center gap-1.5 px-3 py-2 border border-blue-200 text-blue-600 hover:bg-blue-50 text-xs font-medium rounded-lg transition"
+        >
+          <i class="fas fa-download"></i> Unduh Template Excel
+        </a>
+        <label
+          class="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition cursor-pointer"
+          :class="isUploadingReport ? 'opacity-60 cursor-wait' : ''"
+        >
+          <i class="fas fa-spinner fa-spin" x-show="isUploadingReport"></i>
+          <i class="fas fa-upload" x-show="!isUploadingReport"></i>
+          <span x-text="isUploadingReport ? 'Memuat...' : 'Pilih File Laporan'"></span>
+          <input
+            type="file"
+            class="hidden"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            @change="uploadSalesReport($event)"
+            :disabled="isUploadingReport"
+          />
+        </label>
+      </div>
+    </div>
+    <div
+      x-show="uploadReportMessage"
+      x-cloak
+      class="mt-3 text-xs rounded-lg px-3 py-2"
+      :class="uploadReportSuccess ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'"
+      x-text="uploadReportMessage"
+    ></div>
+  </div>
+
   <!-- ── Detail Nozzle — Tiang Tabs ──────────────────────────────────────── -->
   <div
     class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 overflow-hidden"
@@ -201,6 +278,7 @@
           ></span>
         </button>
       </template>
+      {{ if not .IsEdit }}
       <!-- Piutang B2B tab -->
       <button
         type="button"
@@ -213,6 +291,7 @@
         <i class="fas fa-file-invoice-dollar text-xs"></i>
         Piutang B2B
       </button>
+      {{ end }}
       <!-- Pengeluaran Test tab -->
       <button
         type="button"
@@ -272,7 +351,7 @@
                   <input
                     type="number"
                     min="0"
-                    step="1"
+                    step="any"
                     x-model.number="rows[gi].totalisator_awal"
                     @input="calcRow(gi)"
                     class="w-full border border-gray-200 rounded px-2 py-1 text-right text-sm focus:outline-none focus:ring-1 focus:ring-blue-300"
@@ -282,7 +361,7 @@
                   <input
                     type="number"
                     min="0"
-                    step="1"
+                    step="any"
                     x-model.number="rows[gi].totalisator_akhir"
                     @input="calcRow(gi)"
                     class="w-full border border-gray-200 rounded px-2 py-1 text-right text-sm focus:outline-none focus:ring-1 focus:ring-blue-300"
@@ -323,13 +402,103 @@
       </div>
     </template>
 
-    <!-- Piutang B2B panel (placeholder) -->
-    <div x-show="activeTab === 'piutang'" class="p-8 text-center text-gray-400">
-      <i class="fas fa-file-invoice-dollar text-4xl mb-3 text-purple-200"></i>
-      <p class="text-sm italic">
-        Fitur penjualan kredit B2B akan tersedia pada versi berikutnya.
-      </p>
+    {{ if not .IsEdit }}
+    <!-- Piutang B2B panel -->
+    <div x-show="activeTab === 'piutang'" class="p-4">
+      <div class="flex items-center justify-between mb-3">
+        <p class="text-sm text-gray-600">
+          Piutang kredit B2B yang dibuat dari penjualan ini. Setiap baris akan
+          menjadi satu header piutang untuk konsumen yang dipilih.
+        </p>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead
+            class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider"
+          >
+            <tr>
+              <th class="px-3 py-2 text-left">Nama Konsumen</th>
+              <th class="px-3 py-2 text-right w-48">Tagihan (Rp)</th>
+              <th class="px-3 py-2 w-10"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="(pr, pi) in piutangB2B" :key="pi">
+              <tr class="border-t border-gray-100">
+                <td class="px-3 py-2">
+                  <select
+                    x-model.number="pr.partner_id"
+                    class="w-full border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-purple-300"
+                  >
+                    <option value="">-- Pilih Konsumen --</option>
+                    <template x-for="partner in _partnerData" :key="partner.id">
+                      <option :value="partner.id" x-text="partner.name"></option>
+                    </template>
+                  </select>
+                </td>
+                <td class="px-3 py-2">
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    x-model.number="pr.total_tagihan"
+                    class="w-full border border-gray-200 rounded px-2 py-1 text-right text-sm focus:outline-none focus:ring-1 focus:ring-purple-300"
+                    placeholder="0"
+                  />
+                </td>
+                <td class="px-3 py-2 text-center">
+                  <button
+                    type="button"
+                    @click="piutangB2B.splice(pi, 1)"
+                    class="text-red-400 hover:text-red-600 transition"
+                    title="Hapus baris piutang"
+                  >
+                    <i class="fas fa-trash text-xs"></i>
+                  </button>
+                </td>
+              </tr>
+            </template>
+            <template x-if="piutangB2B.length === 0">
+              <tr>
+                <td
+                  colspan="3"
+                  class="px-4 py-6 text-center text-gray-400 text-xs italic"
+                >
+                  Belum ada baris piutang. Klik "Tambah Baris Piutang" untuk
+                  menambahkan.
+                </td>
+              </tr>
+            </template>
+          </tbody>
+          <tfoot
+            x-show="piutangB2B.length > 0"
+            class="bg-purple-50 border-t-2 border-purple-200"
+          >
+            <tr>
+              <td
+                class="px-3 py-2 text-right text-gray-600 text-xs uppercase tracking-wide font-semibold"
+              >
+                Total Piutang B2B
+              </td>
+              <td class="px-3 py-2 text-right text-purple-700 font-bold">
+                Rp <span x-text="formatIDR(totalPiutang())"></span>
+              </td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <div class="mt-3 flex justify-end">
+        <button
+          type="button"
+          @click="addPiutangRow()"
+          class="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium rounded-lg transition"
+        >
+          <i class="fas fa-plus"></i> Tambah Baris Piutang
+        </button>
+      </div>
     </div>
+    {{ end }}
 
     <!-- Pengeluaran Test panel -->
     <div x-show="activeTab === 'pengeluaran-test'" class="p-4">
@@ -389,7 +558,7 @@
                   <input
                     type="number"
                     min="0"
-                    step="1"
+                    step="any"
                     x-model.number="tr.qty_liter"
                     @input="calcTestRow(ti)"
                     class="w-full border border-gray-200 rounded px-2 py-1 text-right text-sm focus:outline-none focus:ring-1 focus:ring-orange-300"
@@ -435,7 +604,7 @@
               <td class="px-3 py-2 text-right text-orange-700 font-bold">
                 Rp
                 <span
-                  x-text="formatIDR(pengeluaranTests.reduce(function(s,r){return s+(r.total_rupiah||0)},0))"
+                  x-text="formatIDR(totalPengeluaranTest())"
                 ></span>
               </td>
               <td></td>
@@ -479,7 +648,7 @@
       <!-- Total Penerimaan -->
       <div>
         <label class="block text-sm font-medium text-gray-600 mb-1"
-          >Total Penerimaan</label
+          >Total Penerimaan Sebelum Pengurang</label
         >
         <input
           type="text"
@@ -490,6 +659,13 @@
           class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-300"
           placeholder="0"
         />
+        <p class="mt-1 text-[11px] text-gray-400">
+          Piutang B2B dan pengeluaran test akan mengurangi nilai ini.
+        </p>
+        <p class="text-xs font-semibold text-green-700">
+          Total Penerimaan Bersih:
+          Rp <span x-text="formatIDR(totalPenerimaanBersih())"></span>
+        </p>
       </div>
 
       <!-- Aktual Uang -->
@@ -589,6 +765,13 @@
       );
     } catch (e) {}
 
+    var _partnerData = [];
+    try {
+      _partnerData = JSON.parse(
+        document.getElementById("partner-data").textContent || "[]",
+      );
+    } catch (e) {}
+
     var _pengeluaranTestData = [];
     try {
       _pengeluaranTestData = JSON.parse(
@@ -606,13 +789,18 @@
       Alpine.data("penjualanForm", function () {
         return {
           isSubmitting: false,
+          isUploadingReport: false,
+          uploadReportMessage: "",
+          uploadReportSuccess: false,
           shiftDetected: false,
           activeTab: "",
           tiangGroups: [],
           rows: [],
+          piutangB2B: [],
           pengeluaranTests: [],
           _jenisTestData: _jenisTestData,
           _bbmData: _bbmData,
+          _partnerData: _partnerData,
           form: {
             tanggal: "",
             shift_id: _shiftID || "",
@@ -729,6 +917,62 @@
             });
           },
 
+          uploadSalesReport: function (event) {
+            var self = this;
+            var input = event.target;
+            var file = input && input.files ? input.files[0] : null;
+            if (!file) return;
+
+            self.uploadReportMessage = "";
+            self.uploadReportSuccess = false;
+            if (file.size > 5 * 1024 * 1024) {
+              self.uploadReportMessage = "Ukuran file laporan maksimal 5 MB";
+              if (input) input.value = "";
+              return;
+            }
+
+            var formData = new FormData();
+            formData.append("file", file);
+            self.isUploadingReport = true;
+            fetch("/transaction/penjualan/upload", {
+              method: "POST",
+              body: formData,
+            })
+              .then(function (response) {
+                return response.json().then(function (payload) {
+                  if (!response.ok) {
+                    throw new Error(payload.message || "File laporan tidak dapat diproses");
+                  }
+                  return payload;
+                });
+              })
+              .then(function (payload) {
+                var uploadedRows = {};
+                (payload.rows || []).forEach(function (row) {
+                  uploadedRows[String(row.nozzle_id)] = row;
+                });
+
+                self.rows.forEach(function (row, index) {
+                  var uploaded = uploadedRows[String(row.nozzle_id)];
+                  if (!uploaded) return;
+                  row.totalisator_awal = Number(uploaded.totalisator_awal) || 0;
+                  row.totalisator_akhir = Number(uploaded.totalisator_akhir) || 0;
+                  self.calcRow(index);
+                });
+                self.calcTotal();
+                self.uploadReportSuccess = true;
+                self.uploadReportMessage = payload.message || "Laporan penjualan berhasil dimuat";
+              })
+              .catch(function (error) {
+                self.uploadReportSuccess = false;
+                self.uploadReportMessage = error.message || "File laporan tidak dapat diproses";
+              })
+              .finally(function () {
+                self.isUploadingReport = false;
+                if (input) input.value = "";
+              });
+          },
+
           // ── Pengeluaran Test helpers ────────────────────────────────────
           addTestRow: function () {
             this.pengeluaranTests.push({
@@ -737,6 +981,30 @@
               qty_liter: 0,
               total_rupiah: 0,
             });
+          },
+
+          addPiutangRow: function () {
+            this.piutangB2B.push({
+              partner_id: 0,
+              total_tagihan: 0,
+            });
+          },
+          totalPiutang: function () {
+            return this.piutangB2B.reduce(function (sum, row) {
+              return sum + (Number(row.total_tagihan) || 0);
+            }, 0);
+          },
+          totalPengeluaranTest: function () {
+            return this.pengeluaranTests.reduce(function (sum, row) {
+              return sum + (Number(row.total_rupiah) || 0);
+            }, 0);
+          },
+          totalPenerimaanBersih: function () {
+            if (_isEdit) {
+              return Number(this.form.total_penerimaan) || 0;
+            }
+            return (Number(this.form.total_penerimaan) || 0) -
+              this.totalPiutang() - this.totalPengeluaranTest();
           },
           calcTestRow: function (ti) {
             var tr = this.pengeluaranTests[ti];
@@ -858,6 +1126,8 @@
               })
             )
               return "Minimal 1 nozzle harus memiliki data penjualan";
+            if (this.totalPenerimaanBersih() < 0)
+              return "Total pengurang tidak boleh melebihi total penerimaan";
             return null;
           },
 
@@ -867,6 +1137,8 @@
               shift_id: Number(self.form.shift_id),
               waktu_mulai: self.form.waktu_mulai,
               waktu_akhir: self.form.waktu_akhir,
+              // Kirim nilai bruto; pengurangan piutang dan pengeluaran test
+              // dihitung ulang di server agar tidak terjadi double deduction.
               total_penerimaan: self.form.total_penerimaan,
               aktual_uang: self.form.aktual_uang,
               details: self.rows.map(function (r) {
@@ -892,6 +1164,18 @@
                     total_rupiah: Number(pt.total_rupiah),
                   };
                 }),
+              piutang_b2b: _isEdit
+                ? []
+                : self.piutangB2B
+                    .filter(function (pr) {
+                      return pr.partner_id && pr.total_tagihan > 0;
+                    })
+                    .map(function (pr) {
+                      return {
+                        partner_id: Number(pr.partner_id),
+                        total_tagihan: Number(pr.total_tagihan),
+                      };
+                    }),
             };
           },
 

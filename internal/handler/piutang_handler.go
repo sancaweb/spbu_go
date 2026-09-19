@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -190,25 +191,25 @@ func (h *PiutangHandler) GetDetail(c *gin.Context) {
 // ─── Create — simpan piutang baru ─────────────────────────────────────────────
 
 type createPiutangDetailInput struct {
-	PenjualanID uint64 `json:"penjualan_id"`
-	NoVoucher   string `json:"no_voucher"`
-	NoPol       string `json:"no_pol"`
-	DriverName  string `json:"driver_name"`
-	BBMID       uint   `json:"bbm_id"`
-	HargaBBM    int64  `json:"harga_bbm"`
-	Margin      int64  `json:"margin"`
-	QtyLiter    int64  `json:"qty_liter"`
+	PenjualanID uint64  `json:"penjualan_id"`
+	NoVoucher   string  `json:"no_voucher"`
+	NoPol       string  `json:"no_pol"`
+	DriverName  string  `json:"driver_name"`
+	BBMID       uint    `json:"bbm_id"`
+	HargaBBM    int64   `json:"harga_bbm"`
+	Margin      int64   `json:"margin"`
+	QtyLiter    float64 `json:"qty_liter"`
 }
 
 type upsertPiutangDetailInput struct {
-	PenjualanID uint64 `json:"penjualan_id"`
-	NoVoucher   string `json:"no_voucher"`
-	NoPol       string `json:"no_pol"`
-	DriverName  string `json:"driver_name"`
-	BBMID       uint   `json:"bbm_id" binding:"required"`
-	HargaBBM    int64  `json:"harga_bbm" binding:"required"`
-	Margin      int64  `json:"margin"`
-	QtyLiter    int64  `json:"qty_liter" binding:"required"`
+	PenjualanID uint64  `json:"penjualan_id"`
+	NoVoucher   string  `json:"no_voucher"`
+	NoPol       string  `json:"no_pol"`
+	DriverName  string  `json:"driver_name"`
+	BBMID       uint    `json:"bbm_id" binding:"required"`
+	HargaBBM    int64   `json:"harga_bbm" binding:"required"`
+	Margin      int64   `json:"margin"`
+	QtyLiter    float64 `json:"qty_liter" binding:"required"`
 }
 
 type createPiutangInput struct {
@@ -258,7 +259,7 @@ func (h *PiutangHandler) Create(c *gin.Context) {
 			HargaBBM:    d.HargaBBM,
 			Margin:      d.Margin,
 			QtyLiter:    d.QtyLiter,
-			TotalLine:   d.HargaBBM * d.QtyLiter,
+			TotalLine:   int64(math.Round(float64(d.HargaBBM) * d.QtyLiter)),
 		})
 	}
 

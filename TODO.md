@@ -1,5 +1,10 @@
 # TODO - Perbaikan Endpoint `/transaction/piutang/rekap`
 
+> Catatan audit 17 September 2026: implementasi filter periode, pengelompokan harian,
+> dan grand total sudah terlihat di source serta tercatat selesai pada
+> `checksheet-piutang-rekap.md`. Regression checklist masih pending; gunakan daftar di
+> bawah sebagai pekerjaan verifikasi/penyempurnaan, bukan asumsi bahwa fitur sudah sign-off.
+
 ## Checklist Task User
 
 - [ ] Tambahkan filter pemilihan periode bulan.

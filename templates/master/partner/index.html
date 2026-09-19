@@ -3,9 +3,10 @@
 <div
   class="space-y-6"
   x-data="partnerManager()"
-  @open-detail.window="openDetailModal($event.detail.id, $event.detail.name, $event.detail.cp, $event.detail.ph, $event.detail.addr)"
-  @open-edit.window="openEditModal($event.detail.id, $event.detail.name, $event.detail.cp, $event.detail.ph, $event.detail.addr)"
+  @open-detail.window="openDetailModal($event.detail)"
+  @open-edit.window="openEditModal($event.detail)"
   @req-delete.window="confirmDelete($event.detail.id)"
+  @req-delete-permanent.window="confirmDeletePermanent($event.detail)"
   @req-restore.window="confirmRestore($event.detail.id)"
 >
   <!-- Header Section -->
@@ -107,6 +108,10 @@
                 Contact Person
               </th>
               <th class="p-4 font-semibold text-slate-600 text-sm">Telepon</th>
+              <th class="p-4 font-semibold text-slate-600 text-sm">Start Date</th>
+              <th class="p-4 font-semibold text-slate-600 text-sm">End Date</th>
+              <th class="p-4 font-semibold text-slate-600 text-sm">Status</th>
+              <th class="p-4 font-semibold text-slate-600 text-sm">Auto Off</th>
               <th class="p-4 font-semibold text-slate-600 text-sm text-right">
                 Aksi
               </th>
@@ -174,6 +179,72 @@
               class="w-full p-2.5 rounded-lg border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none"
             ></textarea>
           </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium mb-1 text-slate-600"
+                >Start Date (Opsional)</label
+              >
+              <input
+                type="date"
+                x-model="form.start_date"
+                class="w-full p-2.5 rounded-lg border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1 text-slate-600"
+                >End Date (Opsional)</label
+              >
+              <input
+                type="date"
+                x-model="form.end_date"
+                :min="form.start_date || null"
+                :required="form.auto_off"
+                class="w-full p-2.5 rounded-lg border border-slate-300 focus:border-[#005596] focus:ring-1 focus:ring-[#005596] outline-none"
+              />
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label class="flex items-center gap-3 cursor-pointer select-none">
+              <div class="relative">
+                <input type="checkbox" x-model="form.isactive" class="sr-only" />
+                <div
+                  :class="form.isactive ? 'bg-green-500' : 'bg-slate-300'"
+                  class="w-11 h-6 rounded-full transition-colors"
+                ></div>
+                <div
+                  :class="form.isactive ? 'translate-x-5' : 'translate-x-0'"
+                  class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform"
+                ></div>
+              </div>
+              <span
+                class="text-sm font-medium"
+                :class="form.isactive ? 'text-green-600' : 'text-slate-500'"
+                x-text="form.isactive ? 'Aktif' : 'Tidak Aktif'"
+              ></span>
+            </label>
+            <label class="flex items-center gap-3 cursor-pointer select-none">
+              <div class="relative">
+                <input type="checkbox" x-model="form.auto_off" class="sr-only" />
+                <div
+                  :class="form.auto_off ? 'bg-amber-500' : 'bg-slate-300'"
+                  class="w-11 h-6 rounded-full transition-colors"
+                ></div>
+                <div
+                  :class="form.auto_off ? 'translate-x-5' : 'translate-x-0'"
+                  class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform"
+                ></div>
+              </div>
+              <span
+                class="text-sm font-medium"
+                :class="form.auto_off ? 'text-amber-600' : 'text-slate-500'"
+                x-text="form.auto_off ? 'Auto Off Aktif' : 'Auto Off Tidak Aktif'"
+              ></span>
+            </label>
+          </div>
+          <p class="text-xs text-slate-500">
+            Jika Auto Off aktif, status partner akan otomatis menjadi tidak aktif
+            setelah End Date terlewati.
+          </p>
         </div>
         <div class="flex justify-end gap-3 mt-8">
           <button
@@ -249,6 +320,46 @@
             x-text="detailData.address || '-'"
           ></div>
         </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label
+              class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1"
+              >Start Date</label
+            >
+            <div class="text-slate-800" x-text="formatDate(detailData.start_date)"></div>
+          </div>
+          <div>
+            <label
+              class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1"
+              >End Date</label
+            >
+            <div class="text-slate-800" x-text="formatDate(detailData.end_date)"></div>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label
+              class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1"
+              >Status</label
+            >
+            <div
+              class="font-semibold"
+              :class="detailData.isactive ? 'text-green-600' : 'text-red-500'"
+              x-text="detailData.isactive ? 'Aktif' : 'Tidak Aktif'"
+            ></div>
+          </div>
+          <div>
+            <label
+              class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1"
+              >Auto Off</label
+            >
+            <div
+              class="font-semibold"
+              :class="detailData.auto_off ? 'text-amber-600' : 'text-slate-500'"
+              x-text="detailData.auto_off ? 'Aktif' : 'Tidak Aktif'"
+            ></div>
+          </div>
+        </div>
       </div>
       <div class="flex justify-end mt-8">
         <button
@@ -270,14 +381,26 @@
       isDetailOpen: false,
       isEdit: false,
       isSubmitting: false,
+      isDeletingPermanent: false,
       form: {
         id: null,
         name: "",
         contact_person: "",
         phone: "",
         address: "",
+        start_date: "",
+        end_date: "",
+        isactive: true,
+        auto_off: false,
       },
       detailData: {},
+
+      formatDate(value) {
+        if (!value) return "-";
+        const date = String(value).split("T")[0];
+        const parts = date.split("-");
+        return parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : date;
+      },
 
       openCreateModal() {
         this.isEdit = false;
@@ -287,18 +410,32 @@
           contact_person: "",
           phone: "",
           address: "",
+          start_date: "",
+          end_date: "",
+          isactive: true,
+          auto_off: false,
         };
         this.isOpen = true;
       },
 
-      openEditModal(id, name, contact_person, phone, address) {
+      openEditModal(partner) {
         this.isEdit = true;
-        this.form = { id, name, contact_person, phone, address };
+        this.form = {
+          id: partner.id,
+          name: partner.name || "",
+          contact_person: partner.contact_person || "",
+          phone: partner.phone || "",
+          address: partner.address || "",
+          start_date: partner.start_date || "",
+          end_date: partner.end_date || "",
+          isactive: partner.isactive !== false,
+          auto_off: partner.auto_off === true,
+        };
         this.isOpen = true;
       },
 
-      openDetailModal(id, name, contact_person, phone, address) {
-        this.detailData = { id, name, contact_person, phone, address };
+      openDetailModal(partner) {
+        this.detailData = partner;
         this.isDetailOpen = true;
       },
 
@@ -311,12 +448,28 @@
             contact_person: "",
             phone: "",
             address: "",
+            start_date: "",
+            end_date: "",
+            isactive: true,
+            auto_off: false,
           };
         }
       },
 
       async submitForm() {
-        if (!this.form.name) return;
+        if (!this.form.name.trim()) return;
+        if (
+          this.form.start_date &&
+          this.form.end_date &&
+          this.form.end_date < this.form.start_date
+        ) {
+          Swal.fire("Periksa Data", "End Date tidak boleh lebih awal dari Start Date", "warning");
+          return;
+        }
+        if (this.form.auto_off && !this.form.end_date) {
+          Swal.fire("Periksa Data", "End Date wajib diisi jika Auto Off diaktifkan", "warning");
+          return;
+        }
 
         this.isSubmitting = true;
 
@@ -329,6 +482,10 @@
           formData.append("contact_person", this.form.contact_person);
           formData.append("phone", this.form.phone);
           formData.append("address", this.form.address);
+          formData.append("start_date", this.form.start_date || "");
+          formData.append("end_date", this.form.end_date || "");
+          formData.append("isactive", this.form.isactive ? "true" : "false");
+          formData.append("auto_off", this.form.auto_off ? "true" : "false");
 
           const response = await fetch(url, {
             method: "POST",
@@ -407,6 +564,59 @@
         } catch (error) {
           console.error("Delete error:", error);
           Swal.fire("Error", "Gagal menghubungi server", "error");
+        }
+      },
+
+      async confirmDeletePermanent(partner) {
+        if (this.isDeletingPermanent) return;
+        this.isDeletingPermanent = true;
+
+        try {
+          const result = await Swal.fire({
+            title: "Hapus Permanen Partner?",
+            text: `Partner "${partner.name}" akan dihapus permanen dan tidak dapat dikembalikan. Penghapusan hanya diizinkan jika belum ada transaksi piutang.`,
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonText: "Ya, Hapus Permanen",
+            cancelButtonText: "Batal",
+            confirmButtonColor: "#dc2626",
+            focusCancel: true,
+            showLoaderOnConfirm: true,
+            allowOutsideClick: () => !Swal.isLoading(),
+            allowEscapeKey: () => !Swal.isLoading(),
+            preConfirm: async () => {
+              try {
+                const response = await fetch(`/master/partner/${partner.id}/delete-permanent`, {
+                  method: "POST",
+                });
+                const data = await response.json();
+                if (!response.ok || data.status !== true) {
+                  if (response.status === 409 || response.status === 404) {
+                    $("#partnerTable").DataTable().ajax.reload(null, false);
+                  }
+                  Swal.showValidationMessage(data.message || "Gagal menghapus partner secara permanen");
+                  return false;
+                }
+                return data;
+              } catch (error) {
+                Swal.showValidationMessage("Gagal menghubungi server. Silakan coba lagi.");
+                return false;
+              }
+            },
+          });
+
+          if (result.isConfirmed) {
+            $("#partnerTable").DataTable().ajax.reload();
+            await Swal.fire({
+              icon: "success",
+              title: "Partner Dihapus",
+              text: result.value.message,
+              timer: 1500,
+              showConfirmButton: false,
+            });
+          }
+        } finally {
+          this.isDeletingPermanent = false;
         }
       },
 
@@ -495,6 +705,12 @@
   document.addEventListener('DOMContentLoaded', function() {
       const isArchive = {{ .IsArchive }};
       const ajaxUrl = isArchive ? "/master/partner/datatable?type=archive" : "/master/partner/datatable";
+      const formatDate = function(value) {
+          if (!value) return '-';
+          const date = String(value).split('T')[0];
+          const parts = date.split('-');
+          return parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : date;
+      };
 
       const table = $('#partnerTable').DataTable({
           serverSide: true,
@@ -530,6 +746,34 @@
                   render: function(data) { return data ? data : '-'; }
               },
               {
+                  data: "start_date",
+                  className: "p-4 text-sm text-slate-600 whitespace-nowrap",
+                  render: function(data) { return formatDate(data); }
+              },
+              {
+                  data: "end_date",
+                  className: "p-4 text-sm text-slate-600 whitespace-nowrap",
+                  render: function(data) { return formatDate(data); }
+              },
+              {
+                  data: "isactive",
+                  className: "p-4 text-sm",
+                  render: function(data) {
+                      return data
+                          ? '<span class="inline-flex px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">Aktif</span>'
+                          : '<span class="inline-flex px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">Tidak Aktif</span>';
+                  }
+              },
+              {
+                  data: "auto_off",
+                  className: "p-4 text-sm",
+                  render: function(data) {
+                      return data
+                          ? '<span class="inline-flex px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Ya</span>'
+                          : '<span class="inline-flex px-2 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">Tidak</span>';
+                  }
+              },
+              {
                   data: "id",
                   orderable: false,
                   searchable: false,
@@ -540,15 +784,19 @@
                       const cp = row.contact_person ? row.contact_person.replace(/'/g, "\\'") : '';
                       const ph = row.phone ? row.phone.replace(/'/g, "\\'") : '';
                       const addr = row.address ? row.address.replace(/'/g, "\\'") : '';
+                      const startDate = row.start_date ? String(row.start_date).split('T')[0] : '';
+                      const endDate = row.end_date ? String(row.end_date).split('T')[0] : '';
+                      const isactive = row.isactive === true;
+                      const autoOff = row.auto_off === true;
 
                       let actionHtml = `<div class="flex justify-end gap-2">
-                          <button onclick="window.dispatchEvent(new CustomEvent('open-detail', {detail: {id: ${data}, name: '${name}', cp: '${cp}', ph: '${ph}', addr: '${addr}'}}))" class="p-1.5 text-[#005596] hover:bg-blue-50 rounded transition-colors tooltip" title="Detail">
+                          <button onclick="window.dispatchEvent(new CustomEvent('open-detail', {detail: {id: ${data}, name: '${name}', contact_person: '${cp}', phone: '${ph}', address: '${addr}', start_date: '${startDate}', end_date: '${endDate}', isactive: ${isactive}, auto_off: ${autoOff}}}))" class="p-1.5 text-[#005596] hover:bg-blue-50 rounded transition-colors tooltip" title="Detail">
                               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
                           </button>`;
 
                       if (!isArchive) {
                           actionHtml += `
-                          <button onclick="window.dispatchEvent(new CustomEvent('open-edit', {detail: {id: ${data}, name: '${name}', cp: '${cp}', ph: '${ph}', addr: '${addr}'}}))" class="p-1.5 text-amber-500 hover:bg-amber-50 rounded transition-colors tooltip" title="Edit">
+                          <button onclick="window.dispatchEvent(new CustomEvent('open-edit', {detail: {id: ${data}, name: '${name}', contact_person: '${cp}', phone: '${ph}', address: '${addr}', start_date: '${startDate}', end_date: '${endDate}', isactive: ${isactive}, auto_off: ${autoOff}}}))" class="p-1.5 text-amber-500 hover:bg-amber-50 rounded transition-colors tooltip" title="Edit">
                               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                           </button>
                           <button onclick="window.dispatchEvent(new CustomEvent('req-delete', {detail: {id: ${data}}}))" class="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors tooltip" title="Nonaktifkan">
@@ -559,6 +807,12 @@
                           <button onclick="window.dispatchEvent(new CustomEvent('req-restore', {detail: {id: ${data}}}))" class="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors tooltip" title="Re-aktifkan">
                               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                           </button>`;
+                          if (row.can_delete_permanent === true) {
+                              actionHtml += `
+                              <button type="button" data-action="delete-permanent" class="px-2 py-1.5 text-red-600 hover:bg-red-50 border border-red-200 rounded transition-colors whitespace-nowrap" title="Hapus permanen partner tanpa transaksi piutang">
+                                  Hapus Permanen
+                              </button>`;
+                          }
                       }
 
                       actionHtml += `</div>`;
@@ -566,6 +820,15 @@
                   }
               }
           ]
+      });
+
+      $('#partnerTable').on('click', 'button[data-action="delete-permanent"]', function() {
+          const partner = table.row($(this).closest('tr')).data();
+          if (isArchive && partner && partner.can_delete_permanent === true) {
+              window.dispatchEvent(new CustomEvent('req-delete-permanent', {
+                  detail: { id: partner.id, name: partner.name }
+              }));
+          }
       });
 
       // Connect custom search input to datatables search

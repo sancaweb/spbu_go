@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -19,20 +20,25 @@ import (
 // ─── Request DTOs ─────────────────────────────────────────────────────────────
 
 type penjualanDetailReq struct {
-	NozzleID         uint  `json:"nozzle_id"`
-	TiangID          uint  `json:"tiang_id"`
-	BBMID            uint  `json:"bbm_id"`
-	BBMPrice         int64 `json:"bbm_price"`
-	Margin           int64 `json:"margin"`
-	TotalisatorAwal  int64 `json:"totalisator_awal"`
-	TotalisatorAkhir int64 `json:"totalisator_akhir"`
+	NozzleID         uint    `json:"nozzle_id"`
+	TiangID          uint    `json:"tiang_id"`
+	BBMID            uint    `json:"bbm_id"`
+	BBMPrice         int64   `json:"bbm_price"`
+	Margin           int64   `json:"margin"`
+	TotalisatorAwal  float64 `json:"totalisator_awal"`
+	TotalisatorAkhir float64 `json:"totalisator_akhir"`
 }
 
 type pengeluaranTestReq struct {
-	JenisTestID uint  `json:"jenis_test_id"`
-	BBMID       uint  `json:"bbm_id"`
-	QtyLiter    int64 `json:"qty_liter"`
-	TotalRupiah int64 `json:"total_rupiah"`
+	JenisTestID uint    `json:"jenis_test_id"`
+	BBMID       uint    `json:"bbm_id"`
+	QtyLiter    float64 `json:"qty_liter"`
+	TotalRupiah int64   `json:"total_rupiah"`
+}
+
+type piutangB2BReq struct {
+	PartnerID    uint  `json:"partner_id"`
+	TotalTagihan int64 `json:"total_tagihan"`
 }
 
 type penjualanRequest struct {
@@ -43,23 +49,24 @@ type penjualanRequest struct {
 	AktualUang       int64                `json:"aktual_uang"`
 	Details          []penjualanDetailReq `json:"details"`
 	PengeluaranTests []pengeluaranTestReq `json:"pengeluaran_tests"`
+	PiutangB2B       []piutangB2BReq      `json:"piutang_b2b"`
 }
 
 // ─── Form data helper (untuk template) ───────────────────────────────────────
 
 type NozzleFormRow struct {
-	NozzleID         uint   `json:"nozzle_id"`
-	TiangID          uint   `json:"tiang_id"`
-	TiangName        string `json:"tiang_name"`
-	Description      string `json:"description"`
-	BBMID            uint   `json:"bbm_id"`
-	BBMName          string `json:"bbm_name"`
-	BBMPrice         int64  `json:"bbm_price"`
-	Margin           int64  `json:"margin"`
-	TotalisatorAwal  int64  `json:"totalisator_awal"`
-	TotalisatorAkhir int64  `json:"totalisator_akhir"`
-	JmlLiter         int64  `json:"jml_liter"`
-	JmlRupiah        int64  `json:"jml_rupiah"`
+	NozzleID         uint    `json:"nozzle_id"`
+	TiangID          uint    `json:"tiang_id"`
+	TiangName        string  `json:"tiang_name"`
+	Description      string  `json:"description"`
+	BBMID            uint    `json:"bbm_id"`
+	BBMName          string  `json:"bbm_name"`
+	BBMPrice         int64   `json:"bbm_price"`
+	Margin           int64   `json:"margin"`
+	TotalisatorAwal  float64 `json:"totalisator_awal"`
+	TotalisatorAkhir float64 `json:"totalisator_akhir"`
+	JmlLiter         float64 `json:"jml_liter"`
+	JmlRupiah        int64   `json:"jml_rupiah"`
 }
 
 // ─── Handler struct ───────────────────────────────────────────────────────────
@@ -72,6 +79,7 @@ type PenjualanHandler struct {
 	settingSvc    service.SettingService
 	jenisTestSvc  service.JenisTestService
 	bbmSvc        service.BBMService
+	partnerSvc    service.PartnerService
 }
 
 func NewPenjualanHandler(
@@ -82,6 +90,7 @@ func NewPenjualanHandler(
 	settingSvc service.SettingService,
 	jenisTestSvc service.JenisTestService,
 	bbmSvc service.BBMService,
+	partnerSvc service.PartnerService,
 ) *PenjualanHandler {
 	return &PenjualanHandler{
 		penjualanSvc:  penjualanSvc,
@@ -91,6 +100,7 @@ func NewPenjualanHandler(
 		settingSvc:    settingSvc,
 		jenisTestSvc:  jenisTestSvc,
 		bbmSvc:        bbmSvc,
+		partnerSvc:    partnerSvc,
 	}
 }
 
@@ -112,16 +122,14 @@ func (h *PenjualanHandler) buildNozzleRows(existingDetails []entity.TrxPenjualan
 	var rows []NozzleFormRow
 	for _, t := range tiangs {
 		for _, n := range t.Nozzles {
-			if !n.IsActive {
+			if !n.IsActive || n.BBM == nil || !n.BBM.IsActive {
 				continue
 			}
 			bbmName := ""
 			var bbmPrice, margin int64
-			if n.BBM != nil {
-				bbmName = n.BBM.Name
-				bbmPrice = int64(n.BBM.Price)
-				margin = int64(n.BBM.Margin)
-			}
+			bbmName = n.BBM.Name
+			bbmPrice = int64(n.BBM.Price)
+			margin = int64(n.BBM.Margin)
 			row := NozzleFormRow{
 				NozzleID:    n.ID,
 				TiangID:     t.ID,
@@ -155,6 +163,132 @@ func (h *PenjualanHandler) buildNozzleRows(existingDetails []entity.TrxPenjualan
 		return "", err
 	}
 	return template.JS(b), nil
+}
+
+func (h *PenjualanHandler) validateActiveReferences(req penjualanRequest) error {
+	activeBBMs, err := h.bbmSvc.GetActive()
+	if err != nil {
+		return fmt.Errorf("gagal memuat BBM aktif: %w", err)
+	}
+	activeBBMIDs := make(map[uint]struct{}, len(activeBBMs))
+	for _, bbm := range activeBBMs {
+		activeBBMIDs[bbm.ID] = struct{}{}
+	}
+
+	for _, detail := range req.Details {
+		if detail.TotalisatorAkhir <= detail.TotalisatorAwal {
+			continue
+		}
+		if _, ok := activeBBMIDs[detail.BBMID]; !ok {
+			return fmt.Errorf("BBM pada detail nozzle harus berstatus aktif")
+		}
+	}
+	for _, test := range req.PengeluaranTests {
+		if test.JenisTestID == 0 && test.BBMID == 0 && test.QtyLiter == 0 {
+			continue
+		}
+		if test.JenisTestID == 0 || test.BBMID == 0 || test.QtyLiter <= 0 {
+			return fmt.Errorf("data pengeluaran test belum lengkap")
+		}
+		if _, ok := activeBBMIDs[test.BBMID]; !ok {
+			return fmt.Errorf("BBM pengeluaran test harus berstatus aktif")
+		}
+	}
+
+	if len(req.PiutangB2B) == 0 {
+		return nil
+	}
+	if h.partnerSvc == nil {
+		return fmt.Errorf("service partner belum tersedia")
+	}
+	activePartners, err := h.partnerSvc.GetActive()
+	if err != nil {
+		return fmt.Errorf("gagal memuat partner aktif: %w", err)
+	}
+	activePartnerIDs := make(map[uint]struct{}, len(activePartners))
+	for _, partner := range activePartners {
+		activePartnerIDs[partner.ID] = struct{}{}
+	}
+	for _, row := range req.PiutangB2B {
+		if row.PartnerID == 0 && row.TotalTagihan == 0 {
+			continue
+		}
+		if row.PartnerID == 0 || row.TotalTagihan <= 0 {
+			return fmt.Errorf("nama konsumen dan tagihan piutang wajib diisi")
+		}
+		if _, ok := activePartnerIDs[row.PartnerID]; !ok {
+			return fmt.Errorf("partner piutang harus berstatus aktif")
+		}
+	}
+	return nil
+}
+
+func buildPiutangHeaders(req penjualanRequest, userID *uint) ([]entity.TrxPiutang, int64, error) {
+	var headers []entity.TrxPiutang
+	var total int64
+	for _, row := range req.PiutangB2B {
+		if row.PartnerID == 0 && row.TotalTagihan == 0 {
+			continue
+		}
+		if row.PartnerID == 0 || row.TotalTagihan <= 0 {
+			return nil, 0, fmt.Errorf("nama konsumen dan tagihan piutang wajib diisi")
+		}
+		headers = append(headers, entity.TrxPiutang{
+			PelangganID:  row.PartnerID,
+			TotalTagihan: row.TotalTagihan,
+			Status:       entity.PiutangUnpaid,
+			CreatedBy:    userID,
+			UpdatedBy:    userID,
+		})
+		total += row.TotalTagihan
+	}
+	return headers, total, nil
+}
+
+func calculateNetPenerimaan(gross, totalPiutang, totalPengeluaranTest int64) (int64, error) {
+	deductions := totalPiutang + totalPengeluaranTest
+	if gross < deductions {
+		return 0, fmt.Errorf("total pengurang piutang dan pengeluaran test melebihi total penerimaan")
+	}
+	return gross - deductions, nil
+}
+
+func (h *PenjualanHandler) preparePenjualanRequest(req penjualanRequest, userID *uint, applyDeductions bool) (*entity.TrxPenjualan, []entity.TrxPiutang, error) {
+	if err := h.validateActiveReferences(req); err != nil {
+		return nil, nil, err
+	}
+	p, err := parsePenjualanRequest(req, userID)
+	if err != nil {
+		return nil, nil, err
+	}
+	activeBBMs, err := h.bbmSvc.GetActive()
+	if err != nil {
+		return nil, nil, fmt.Errorf("gagal memuat harga BBM aktif: %w", err)
+	}
+	activeBBMPrices := make(map[uint]int64, len(activeBBMs))
+	for _, bbm := range activeBBMs {
+		activeBBMPrices[bbm.ID] = int64(bbm.Price)
+	}
+	for i := range p.PengeluaranTests {
+		p.PengeluaranTests[i].TotalRupiah = int64(math.Round(p.PengeluaranTests[i].QtyLiter * float64(activeBBMPrices[p.PengeluaranTests[i].BBMID])))
+	}
+	piutangs, totalPiutang, err := buildPiutangHeaders(req, userID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !applyDeductions {
+		return p, piutangs, nil
+	}
+	var totalPengeluaranTest int64
+	for _, test := range p.PengeluaranTests {
+		totalPengeluaranTest += test.TotalRupiah
+	}
+	netPenerimaan, err := calculateNetPenerimaan(req.TotalPenerimaan, totalPiutang, totalPengeluaranTest)
+	if err != nil {
+		return nil, nil, err
+	}
+	p.TotalPenerimaan = netPenerimaan
+	return p, piutangs, nil
 }
 
 // parsePenjualanRequest validates + converts request to TrxPenjualan entity.
@@ -191,7 +325,7 @@ func parsePenjualanRequest(req penjualanRequest, userID *uint) (*entity.TrxPenju
 			continue // skip baris tanpa penjualan
 		}
 		hasData = true
-		jmlRupiah := jmlLiter * dr.BBMPrice
+		jmlRupiah := int64(math.Round(jmlLiter * float64(dr.BBMPrice)))
 		p.TotalRpTotalisator += jmlRupiah
 		p.Details = append(p.Details, entity.TrxPenjualanDetail{
 			TiangID:          dr.TiangID,
@@ -288,9 +422,11 @@ func (h *PenjualanHandler) FormCreate(c *gin.Context) {
 	shifts, _ := h.shiftSvc.GetAll()
 	jenisTests, _ := h.jenisTestSvc.GetActive()
 	bbms, _ := h.bbmSvc.GetActive()
+	partners, _ := h.partnerSvc.GetActive()
 
 	jenisTestJSON, _ := json.Marshal(jenisTests)
 	bbmJSON, _ := json.Marshal(bbms)
+	partnerJSON, _ := json.Marshal(partners)
 
 	c.HTML(http.StatusOK, "transaction/penjualan/form.html", gin.H{
 		"User":                 user,
@@ -304,6 +440,7 @@ func (h *PenjualanHandler) FormCreate(c *gin.Context) {
 		"Penjualan":            nil,
 		"JenisTestsJSON":       template.JS(jenisTestJSON),
 		"BBMsJSON":             template.JS(bbmJSON),
+		"PartnersJSON":         template.JS(partnerJSON),
 		"PengeluaranTestsJSON": template.JS("[]"),
 	})
 }
@@ -334,9 +471,11 @@ func (h *PenjualanHandler) FormEdit(c *gin.Context) {
 	shifts, _ := h.shiftSvc.GetAll()
 	jenisTests, _ := h.jenisTestSvc.GetActive()
 	bbms, _ := h.bbmSvc.GetActive()
+	partners, _ := h.partnerSvc.GetActive()
 
 	jenisTestJSON, _ := json.Marshal(jenisTests)
 	bbmJSON, _ := json.Marshal(bbms)
+	partnerJSON, _ := json.Marshal(partners)
 	ptJSON, _ := json.Marshal(p.PengeluaranTests)
 
 	c.HTML(http.StatusOK, "transaction/penjualan/form.html", gin.H{
@@ -351,6 +490,7 @@ func (h *PenjualanHandler) FormEdit(c *gin.Context) {
 		"Penjualan":            p,
 		"JenisTestsJSON":       template.JS(jenisTestJSON),
 		"BBMsJSON":             template.JS(bbmJSON),
+		"PartnersJSON":         template.JS(partnerJSON),
 		"PengeluaranTestsJSON": template.JS(ptJSON),
 	})
 }
@@ -396,14 +536,14 @@ func (h *PenjualanHandler) Create(c *gin.Context) {
 		return
 	}
 
-	p, err := parsePenjualanRequest(req, userID)
+	p, piutangs, err := h.preparePenjualanRequest(req, userID, true)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": err.Error()})
 		return
 	}
 	p.CreatedBy = userID
 
-	if err := h.penjualanSvc.Create(p); err != nil {
+	if err := h.penjualanSvc.CreateWithPiutangs(p, piutangs); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "Gagal menyimpan: " + err.Error()})
 		return
 	}
@@ -454,7 +594,7 @@ func (h *PenjualanHandler) Update(c *gin.Context) {
 		return
 	}
 
-	p, err := parsePenjualanRequest(req, userID)
+	p, _, err := h.preparePenjualanRequest(req, userID, false)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"status": "error", "message": err.Error()})
 		return

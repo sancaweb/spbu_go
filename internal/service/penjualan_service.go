@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"log"
+	"math"
 
 	"spbu_go/internal/dto"
 	"spbu_go/internal/entity"
@@ -15,6 +16,7 @@ type PenjualanService interface {
 	GetByID(id uint64) (*entity.TrxPenjualan, error)
 	Datatable(req dto.DatatableRequest) (int64, int64, []dto.PenjualanDTRow, error)
 	Create(p *entity.TrxPenjualan) error
+	CreateWithPiutangs(p *entity.TrxPenjualan, piutangs []entity.TrxPiutang) error
 	Update(p *entity.TrxPenjualan) error
 	Delete(id uint64) error
 	// PostJournal memposting (atau re-posting) jurnal double-entry untuk satu penjualan.
@@ -23,7 +25,7 @@ type PenjualanService interface {
 	// ReverseJournal menghapus semua jurnal terkait satu penjualan (dipakai saat delete).
 	ReverseJournal(id uint64) error
 	// GetLastTotalisatorByNozzle mengembalikan map nozzle_id → totalisator_akhir terakhir.
-	GetLastTotalisatorByNozzle() (map[uint]int64, error)
+	GetLastTotalisatorByNozzle() (map[uint]float64, error)
 }
 
 type penjualanService struct {
@@ -51,6 +53,10 @@ func (s *penjualanService) Create(p *entity.TrxPenjualan) error {
 	return s.repo.Create(p)
 }
 
+func (s *penjualanService) CreateWithPiutangs(p *entity.TrxPenjualan, piutangs []entity.TrxPiutang) error {
+	return s.repo.CreateWithPiutangs(p, piutangs)
+}
+
 func (s *penjualanService) Update(p *entity.TrxPenjualan) error {
 	return s.repo.Update(p)
 }
@@ -63,7 +69,7 @@ func (s *penjualanService) ReverseJournal(id uint64) error {
 	return s.accounting.ReverseTransaction("penjualan", uint(id))
 }
 
-func (s *penjualanService) GetLastTotalisatorByNozzle() (map[uint]int64, error) {
+func (s *penjualanService) GetLastTotalisatorByNozzle() (map[uint]float64, error) {
 	return s.repo.GetLastTotalisatorByNozzle()
 }
 
@@ -103,8 +109,8 @@ func (s *penjualanService) PostJournal(p *entity.TrxPenjualan, createdBy *uint) 
 		}
 		g := aggMap[d.BBMID]
 		hargaDasar := d.BBMPrice - d.Margin
-		g.hpp += d.JmlLiter * hargaDasar
-		g.pendapatan += d.JmlLiter * d.Margin
+		g.hpp += int64(math.Round(d.JmlLiter * float64(hargaDasar)))
+		g.pendapatan += int64(math.Round(d.JmlLiter * float64(d.Margin)))
 	}
 
 	var lines []JournalLine

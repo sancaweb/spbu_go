@@ -835,9 +835,9 @@ func seedPenjualan() {
 					BBMID:            nz.BBMID,
 					BBMPrice:         price,
 					Margin:           margin,
-					TotalisatorAwal:  totAwal,
-					TotalisatorAkhir: totAkhir,
-					JmlLiter:         jmlLiter,
+					TotalisatorAwal:  float64(totAwal),
+					TotalisatorAkhir: float64(totAkhir),
+					JmlLiter:         float64(jmlLiter),
 					JmlRupiah:        jmlRupiah,
 				})
 			}
@@ -976,7 +976,7 @@ func seedPiutang() {
 				BBMID:       src.BBMID,
 				HargaBBM:    harga,
 				Margin:      src.Margin,
-				QtyLiter:    qty,
+				QtyLiter:    float64(qty),
 				TotalLine:   totalLine,
 				Created:     createdAt,
 				Updated:     createdAt,

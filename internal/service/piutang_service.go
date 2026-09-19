@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -106,7 +107,7 @@ func (s *piutangService) Create(p *entity.TrxPiutang, createdBy *uint) error {
 		p.Details[i].CreatedBy = createdBy
 		p.Details[i].UpdatedBy = createdBy
 		// TotalLine = harga_bbm × qty_liter
-		p.Details[i].TotalLine = p.Details[i].HargaBBM * p.Details[i].QtyLiter
+		p.Details[i].TotalLine = int64(math.Round(float64(p.Details[i].HargaBBM) * p.Details[i].QtyLiter))
 	}
 
 	// Hitung total_tagihan dari detail (jika belum di-set)
@@ -135,7 +136,7 @@ func (s *piutangService) Create(p *entity.TrxPiutang, createdBy *uint) error {
 func (s *piutangService) AddDetail(piutangID uint64, detail *entity.TrxPiutangDetail, updatedBy *uint) error {
 	detail.UpdatedBy = updatedBy
 	detail.CreatedBy = updatedBy
-	detail.TotalLine = detail.HargaBBM * detail.QtyLiter
+	detail.TotalLine = int64(math.Round(float64(detail.HargaBBM) * detail.QtyLiter))
 	if err := s.repo.AddDetail(piutangID, detail); err != nil {
 		return fmt.Errorf("gagal menambah detail piutang: %w", err)
 	}
@@ -144,7 +145,7 @@ func (s *piutangService) AddDetail(piutangID uint64, detail *entity.TrxPiutangDe
 
 func (s *piutangService) UpdateDetail(piutangID uint64, detailID uint64, detail *entity.TrxPiutangDetail, updatedBy *uint) error {
 	detail.UpdatedBy = updatedBy
-	detail.TotalLine = detail.HargaBBM * detail.QtyLiter
+	detail.TotalLine = int64(math.Round(float64(detail.HargaBBM) * detail.QtyLiter))
 	if err := s.repo.UpdateDetail(piutangID, detailID, detail); err != nil {
 		return fmt.Errorf("gagal memperbarui detail piutang: %w", err)
 	}
@@ -164,8 +165,8 @@ func (s *piutangService) postJournalCreate(p *entity.TrxPiutang, createdBy *uint
 			agg[d.BBMID] = &bbmAgg{}
 		}
 		hargaDasar := d.HargaBBM - d.Margin
-		agg[d.BBMID].hpp += hargaDasar * d.QtyLiter
-		agg[d.BBMID].pendapatan += d.Margin * d.QtyLiter
+		agg[d.BBMID].hpp += int64(math.Round(float64(hargaDasar) * d.QtyLiter))
+		agg[d.BBMID].pendapatan += int64(math.Round(float64(d.Margin) * d.QtyLiter))
 	}
 
 	lines := []JournalLine{

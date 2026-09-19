@@ -207,94 +207,102 @@
 </div>
 
 <script>
-  document.addEventListener("alpine:init", () => {
-    Alpine.data("shiftManager", () => ({
-      modalOpen: false,
-      loading: false,
-      editId: null,
-      form: { shift_name: "", shift_time: "", is_cross_day: false },
+  (function () {
+    const initShiftManager = () => {
+      Alpine.data("shiftManager", () => ({
+        modalOpen: false,
+        loading: false,
+        editId: null,
+        form: { shift_name: "", shift_time: "", is_cross_day: false },
 
-      openCreate() {
-        this.editId = null;
-        this.form = { shift_name: "", shift_time: "", is_cross_day: false };
-        this.modalOpen = true;
-      },
+        openCreate() {
+          this.editId = null;
+          this.form = { shift_name: "", shift_time: "", is_cross_day: false };
+          this.modalOpen = true;
+        },
 
-      openEdit(id, name, time, isCrossDay) {
-        this.editId = id;
-        this.form = { shift_name: name, shift_time: time, is_cross_day: !!isCrossDay };
-        this.modalOpen = true;
-      },
+        openEdit(id, name, time, isCrossDay) {
+          this.editId = id;
+          this.form = { shift_name: name, shift_time: time, is_cross_day: !!isCrossDay };
+          this.modalOpen = true;
+        },
 
-      closeModal() {
-        this.modalOpen = false;
-      },
+        closeModal() {
+          this.modalOpen = false;
+        },
 
-      async submitForm() {
-        this.loading = true;
-        const body = new URLSearchParams();
-        body.append("shift_name", this.form.shift_name);
-        body.append("shift_time", this.form.shift_time);
-        body.append("is_cross_day", this.form.is_cross_day ? "true" : "false");
+        async submitForm() {
+          this.loading = true;
+          const body = new URLSearchParams();
+          body.append("shift_name", this.form.shift_name);
+          body.append("shift_time", this.form.shift_time);
+          body.append("is_cross_day", this.form.is_cross_day ? "true" : "false");
 
-        const url = this.editId
-          ? `/master/shift/${this.editId}`
-          : "/master/shift";
-        try {
-          const res = await fetch(url, { method: "POST", body });
-          const data = await res.json();
-          if (data.status) {
+          const url = this.editId
+            ? `/master/shift/${this.editId}`
+            : "/master/shift";
+          try {
+            const res = await fetch(url, { method: "POST", body });
+            const data = await res.json();
+            if (data.status) {
+              Swal.fire({
+                icon: "success",
+                title: "Berhasil",
+                text: data.message,
+                timer: 1500,
+                showConfirmButton: false,
+              }).then(() => location.reload());
+            } else {
+              Swal.fire({ icon: "error", title: "Gagal", text: data.message });
+            }
+          } catch (e) {
             Swal.fire({
-              icon: "success",
-              title: "Berhasil",
-              text: data.message,
-              timer: 1500,
-              showConfirmButton: false,
-            }).then(() => location.reload());
-          } else {
-            Swal.fire({ icon: "error", title: "Gagal", text: data.message });
+              icon: "error",
+              title: "Error",
+              text: "Terjadi kesalahan koneksi",
+            });
+          } finally {
+            this.loading = false;
           }
-        } catch (e) {
+        },
+
+        deleteShift(id, name) {
           Swal.fire({
-            icon: "error",
-            title: "Error",
-            text: "Terjadi kesalahan koneksi",
+            title: "Hapus Shift?",
+            text: `"${name}" akan dihapus permanen.`,
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#ef4444",
+            cancelButtonText: "Batal",
+            confirmButtonText: "Hapus",
+          }).then(async (result) => {
+            if (!result.isConfirmed) return;
+            const res = await fetch(`/master/shift/${id}/delete`, {
+              method: "POST",
+            });
+            const data = await res.json();
+            if (data.status) {
+              Swal.fire({
+                icon: "success",
+                title: "Dihapus",
+                text: data.message,
+                timer: 1500,
+                showConfirmButton: false,
+              }).then(() => location.reload());
+            } else {
+              Swal.fire({ icon: "error", title: "Gagal", text: data.message });
+            }
           });
-        } finally {
-          this.loading = false;
-        }
-      },
+        },
+      }));
+    };
 
-      deleteShift(id, name) {
-        Swal.fire({
-          title: "Hapus Shift?",
-          text: `"${name}" akan dihapus permanen.`,
-          icon: "warning",
-          showCancelButton: true,
-          confirmButtonColor: "#ef4444",
-          cancelButtonText: "Batal",
-          confirmButtonText: "Hapus",
-        }).then(async (result) => {
-          if (!result.isConfirmed) return;
-          const res = await fetch(`/master/shift/${id}/delete`, {
-            method: "POST",
-          });
-          const data = await res.json();
-          if (data.status) {
-            Swal.fire({
-              icon: "success",
-              title: "Dihapus",
-              text: data.message,
-              timer: 1500,
-              showConfirmButton: false,
-            }).then(() => location.reload());
-          } else {
-            Swal.fire({ icon: "error", title: "Gagal", text: data.message });
-          }
-        });
-      },
-    }));
-  });
+    if (window.Alpine) {
+      initShiftManager();
+    } else {
+      document.addEventListener("alpine:init", initShiftManager);
+    }
+  })();
 </script>
 
 {{ template "footer.html" . }} {{ end }}
